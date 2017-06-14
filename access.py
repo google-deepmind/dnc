@@ -96,7 +96,7 @@ class MemoryAccess(snt.RNNCore):
       num_writes: The number of write heads (fixed at 1 in the paper).
       name: The name of the module.
     """
-    super(MemoryAccess, self).__init__(name)
+    super(MemoryAccess, self).__init__(name=name)
     self._memory_size = memory_size
     self._word_size = word_size
     self._num_reads = num_reads
