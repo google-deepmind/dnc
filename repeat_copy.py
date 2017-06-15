@@ -209,7 +209,7 @@ class RepeatCopy(snt.AbstractModule):
           steps, in each sequence before any subsequent reduction over the time
           and batch dimensions.
     """
-    super(RepeatCopy, self).__init__(name)
+    super(RepeatCopy, self).__init__(name=name)
 
     self._batch_size = batch_size
     self._num_bits = num_bits
