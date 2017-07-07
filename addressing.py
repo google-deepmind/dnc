@@ -126,7 +126,7 @@ class TemporalLinkage(snt.RNNCore):
       num_writes: The number of write heads.
       name: Name of the module.
     """
-    super(TemporalLinkage, self).__init__(name)
+    super(TemporalLinkage, self).__init__(name=name)
     self._memory_size = memory_size
     self._num_writes = num_writes
 
@@ -273,7 +273,7 @@ class Freeness(snt.RNNCore):
       memory_size: Number of memory slots.
       name: Name of the module.
     """
-    super(Freeness, self).__init__(name)
+    super(Freeness, self).__init__(name=name)
     self._memory_size = memory_size
 
   def _build(self, write_weights, free_gate, read_weights, prev_usage):
