@@ -144,7 +144,7 @@ def train(num_training_iterations, report_interval):
     start_iteration = sess.run(global_step)
     total_loss = 0
 
-    for train_iteration in xrange(start_iteration, num_training_iterations):
+    for train_iteration in range(start_iteration, num_training_iterations):
       _, loss = sess.run([train_step, train_loss])
       total_loss += loss
 

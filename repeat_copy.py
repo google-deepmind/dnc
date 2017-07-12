@@ -86,15 +86,15 @@ def bitstring_readable(data, batch_size, model_output=None, whole_batch=False):
   obs_batch = data.observations
   targ_batch = data.target
 
-  iterate_over = xrange(batch_size) if whole_batch else xrange(1)
+  iterate_over = range(batch_size) if whole_batch else range(1)
 
   batch_strings = []
   for batch_index in iterate_over:
     obs = obs_batch[:, batch_index, :]
     targ = targ_batch[:, batch_index, :]
 
-    obs_channels = xrange(obs.shape[1])
-    targ_channels = xrange(targ.shape[1])
+    obs_channels = range(obs.shape[1])
+    targ_channels = range(targ.shape[1])
     obs_channel_strings = [_readable(obs[:, i]) for i in obs_channels]
     targ_channel_strings = [_readable(targ[:, i]) for i in targ_channels]
 
