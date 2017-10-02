@@ -22,8 +22,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.python.ops import rnn
 
-import access
-import util
+from dnc import access, util
 
 BATCH_SIZE = 2
 MEMORY_SIZE = 20

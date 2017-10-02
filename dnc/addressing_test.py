@@ -22,8 +22,7 @@ import numpy as np
 import sonnet as snt
 import tensorflow as tf
 
-import addressing
-import util
+from dnc import addressing, util
 
 
 class WeightedSoftmaxTest(tf.test.TestCase):

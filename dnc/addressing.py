@@ -19,10 +19,11 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+
 import sonnet as snt
 import tensorflow as tf
 
-import util
+from dnc import util
 
 # Ensure values are greater than epsilon to avoid numerical instability.
 _EPSILON = 1e-6
