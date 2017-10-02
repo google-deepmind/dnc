@@ -23,11 +23,12 @@ from __future__ import division
 from __future__ import print_function
 
 import collections
+
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
 
-import access
+from dnc import access
 
 DNCState = collections.namedtuple('DNCState', ('access_output', 'access_state',
                                                'controller_state'))
