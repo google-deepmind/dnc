@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(
-    name='sample',
+    name='dnc',
 
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
