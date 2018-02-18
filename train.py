@@ -141,6 +141,8 @@ def train(num_training_iterations, report_interval):
   with tf.train.SingularMonitoredSession(
       hooks=hooks, checkpoint_dir=FLAGS.checkpoint_dir) as sess:
 
+    writer = tf.summary.FileWriter("/tmp/log/...", sess.graph)
+
     start_iteration = sess.run(global_step)
     total_loss = 0
 
@@ -156,6 +158,8 @@ def train(num_training_iterations, report_interval):
                         train_iteration, total_loss / report_interval,
                         dataset_string)
         total_loss = 0
+
+    writer.close()
 
 
 def main(unused_argv):
