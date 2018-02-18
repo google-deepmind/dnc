@@ -97,6 +97,8 @@ def train(num_training_iterations, report_interval):
   dataset = repeat_copy.RepeatCopy(FLAGS.num_bits, FLAGS.batch_size,
                                    FLAGS.min_length, FLAGS.max_length,
                                    FLAGS.min_repeats, FLAGS.max_repeats)
+
+  # Sonnet runs _build in RepeatCopy when you make a call to the module
   dataset_tensors = dataset()
 
   output_logits = run_model(dataset_tensors.observations, dataset.target_size)
