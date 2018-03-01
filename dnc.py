@@ -87,7 +87,7 @@ class DNC(snt.RNNCore):
     Args:
       inputs: Tensor input.
       prev_state: A `DNCState` tuple containing the fields `access_output`,
-          `access_state` and `controller_state`. `access_state` is a 3-D Tensor
+          `access_state` and `controller_state`. `access_output` is a 3-D Tensor
           of shape `[batch_size, num_reads, word_size]` containing read words.
           `access_state` is a tuple of the access module's state, and
           `controller_state` is a tuple of controller module's state.
