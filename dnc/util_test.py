@@ -21,7 +21,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
-import util
+from dnc import util
 
 
 class BatchInvertPermutation(tf.test.TestCase):
