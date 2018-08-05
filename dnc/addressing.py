@@ -22,7 +22,7 @@ import collections
 import sonnet as snt
 import tensorflow as tf
 
-import util
+from dnc import util
 
 # Ensure values are greater than epsilon to avoid numerical instability.
 _EPSILON = 1e-6
@@ -32,7 +32,7 @@ TemporalLinkageState = collections.namedtuple('TemporalLinkageState',
 
 
 def _vector_norms(m):
-  squared_norms = tf.reduce_sum(m * m, axis=2, keep_dims=True)
+  squared_norms = tf.reduce_sum(m * m, axis=2, keepdims=True)
   return tf.sqrt(squared_norms + _EPSILON)
 
 
@@ -202,7 +202,7 @@ class TemporalLinkage(snt.RNNCore):
       containing the new link graphs for each write head.
     """
     with tf.name_scope('link'):
-      batch_size = prev_link.get_shape()[0].value
+      batch_size = tf.shape(prev_link)[0]
       write_weights_i = tf.expand_dims(write_weights, 3)
       write_weights_j = tf.expand_dims(write_weights, 2)
       prev_precedence_weights_j = tf.expand_dims(prev_precedence_weights, 2)
@@ -236,7 +236,7 @@ class TemporalLinkage(snt.RNNCore):
       new precedence weights.
     """
     with tf.name_scope('precedence_weights'):
-      write_sum = tf.reduce_sum(write_weights, 2, keep_dims=True)
+      write_sum = tf.reduce_sum(write_weights, 2, keepdims=True)
       return (1 - write_sum) * prev_precedence_weights + write_weights
 
   @property
@@ -351,7 +351,7 @@ class Freeness(snt.RNNCore):
     """
     with tf.name_scope('usage_after_write'):
       # Calculate the aggregated effect of all write heads
-      write_weights = 1 - tf.reduce_prod(1 - write_weights, [1])
+      write_weights = 1 - util.reduce_prod(1 - write_weights, 1)
       return prev_usage + (1 - prev_usage) * write_weights
 
   def _usage_after_read(self, prev_usage, free_gate, read_weights):
@@ -370,7 +370,7 @@ class Freeness(snt.RNNCore):
     with tf.name_scope('usage_after_read'):
       free_gate = tf.expand_dims(free_gate, -1)
       free_read_weights = free_gate * read_weights
-      phi = tf.reduce_prod(1 - free_read_weights, [1], name='phi')
+      phi = util.reduce_prod(1 - free_read_weights, 1, name='phi')
       return prev_usage * phi
 
   def _allocation(self, usage):
