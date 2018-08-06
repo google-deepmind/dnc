@@ -21,8 +21,8 @@ from __future__ import print_function
 import tensorflow as tf
 import sonnet as snt
 
-import dnc
-import repeat_copy
+from dnc import dnc
+from dnc import repeat_copy
 
 FLAGS = tf.flags.FLAGS
 

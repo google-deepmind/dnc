@@ -97,3 +97,7 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+# vscode and its extensions
+.vscode/*
+.history/*
