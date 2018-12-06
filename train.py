@@ -96,9 +96,12 @@ def run_model(input_sequence, output_size, return_weights, time_major=False):
 def train(num_training_iterations, report_interval):
   """Trains the DNC and periodically reports the loss."""
 
-  dataset = repeat_copy.RepeatCopy(FLAGS.num_bits, FLAGS.batch_size,
-                                   FLAGS.min_length, FLAGS.max_length,
-                                   FLAGS.min_repeats, FLAGS.max_repeats)
+  # dataset = repeat_copy.RepeatCopy(FLAGS.num_bits, FLAGS.batch_size,
+  #                                  FLAGS.min_length, FLAGS.max_length,
+  #                                  FLAGS.min_repeats, FLAGS.max_repeats)
+
+  dataset = repeat_sequence.RepeatSequence(3, 5, 7, FLAGS.batch_size)
+
   dataset_tensors = dataset()
 
   output_concat = run_model(dataset_tensors.observations, dataset.target_size, True, time_major=dataset.time_major())
