@@ -1,6 +1,7 @@
 import tensorflow as tf
 
-import rom
+from dnc import rom
+# import rom
 
 class RomTest(tf.test.TestCase):
 
@@ -9,7 +10,7 @@ class RomTest(tf.test.TestCase):
     module = rom.ROM(content)
 
     read_key = tf.constant([[1,2,3,4],[0,3,5,7], [1,1,1,1]], dtype='float32')
-    read_strength = tf.constant([10000, 10000, 1], dtype='float32')
+    read_strength = tf.constant([[10000], [10000], [1]], dtype='float32')
     read_mode = tf.constant([[1,0], [1,0], [0,1]], dtype='float32')
     prev_read_weight = tf.constant([[0,0.5,0.5], [0.3,0.4,0.3], [0,1,0]], dtype='float32')
 
@@ -36,11 +37,13 @@ class MixerTest(tf.test.TestCase):
     address_controller = tf.constant([[0, 1, 0], [0, 1, 0]], dtype='float32')
     address_rom = tf.constant([[0, 0, 1], [0, 0, 1]], dtype='float32')
 
-    mu_controller = tf.constant([1, 0], dtype='float32')
-    mu_rom = tf.constant([1, 1], dtype='float32')
-    previous_mu = tf.constant([1, 0.5], dtype='float32')
+    mu_controller = tf.constant([[1], [0]], dtype='float32')
+    mu_rom = tf.constant([[1], [1]], dtype='float32')
+    previous_mu = tf.constant([[1], [0.5]], dtype='float32')
 
     address, mu = module(address_controller, address_rom, mu_controller, mu_rom, previous_mu)
+
+    print(address)
 
     with self.test_session():
       address_np, mu_np = address.eval(), mu.eval()

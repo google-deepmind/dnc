@@ -11,8 +11,8 @@ DatasetTensors = collections.namedtuple('DatasetTensors', ('observations', 'targ
 class RepeatSequence(snt.AbstractModule):
 
   def __init__(self,
-               min_nb_vecs=1,
-               max_nb_vecs=4,
+               min_nb_vecs=3,
+               max_nb_vecs=5,
                nb_bits=7,
                batch_size=16):
     super(RepeatSequence, self).__init__(name='RepeatSequence')
@@ -30,7 +30,7 @@ class RepeatSequence(snt.AbstractModule):
 
     # Create the random variable
     nb_vecs_batch = tf.random_uniform(
-        [1], minval=self._min_nb_vecs, maxval=self._max_nb_vecs + 1, dtype=tf.int32)
+        [1], minval=self._min_nb_vecs, maxval=self._max_nb_vecs+1, dtype=tf.int32)
 
     for batch_index in range(0, self._batch_size):
       nb_vecs = nb_vecs_batch[0]

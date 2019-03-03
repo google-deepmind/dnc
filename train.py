@@ -22,13 +22,14 @@ import tensorflow as tf
 import sonnet as snt
 
 from dnc import dnc
+from dnc import dnc_feedforward
 from dnc import repeat_copy
 from tasks import repeat_sequence
 
 FLAGS = tf.flags.FLAGS
 
 # Model parameters
-tf.flags.DEFINE_integer("hidden_size", 64, "Size of LSTM hidden layer.")
+tf.flags.DEFINE_integer("hidden_size", 96, "Size of LSTM hidden layer.")
 tf.flags.DEFINE_integer("memory_size", 16, "The number of memory slots.")
 tf.flags.DEFINE_integer("word_size", 16, "The width of each memory slot.")
 tf.flags.DEFINE_integer("num_write_heads", 1, "Number of memory write heads.")
@@ -82,6 +83,8 @@ def run_model(input_sequence, output_size, return_weights, time_major=False):
   clip_value = FLAGS.clip_value
 
   dnc_core = dnc.DNC(access_config, controller_config, output_size, clip_value, return_weights=return_weights)
+  # TODO implement this with the feedforward controller. will need to return some different values there for the images enz
+  # dnc_core = dnc_feedforward.DNCfeedforward(access_config, controller_config, 10, clip_value, return_weights=return_weights)
   initial_state = dnc_core.initial_state(FLAGS.batch_size)
   output_sequence, _ = tf.nn.dynamic_rnn(
       cell=dnc_core,
@@ -100,7 +103,7 @@ def train(num_training_iterations, report_interval):
   #                                  FLAGS.min_length, FLAGS.max_length,
   #                                  FLAGS.min_repeats, FLAGS.max_repeats)
 
-  dataset = repeat_sequence.RepeatSequence(3, 5, 7, FLAGS.batch_size)
+  dataset = repeat_sequence.RepeatSequence(5, 5, 7, FLAGS.batch_size)
 
   dataset_tensors = dataset()
 
@@ -109,6 +112,9 @@ def train(num_training_iterations, report_interval):
   output_logits = output_concat[:, :, 0:dataset.target_size]
   output_read_weightings = output_concat[:, :, dataset.target_size:(dataset.target_size+FLAGS.memory_size)]
   output_write_weightings = output_concat[:, :, (dataset.target_size+FLAGS.memory_size):(dataset.target_size+2*FLAGS.memory_size)]
+  output_mu = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size):(dataset.target_size+2*FLAGS.memory_size+1)]
+  output_rom_weight = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1):(dataset.target_size+2*FLAGS.memory_size+6)]
+  output_rom_mode = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+6):]
 
   # Used for visualization.
   # output = tf.round(
@@ -128,6 +134,9 @@ def train(num_training_iterations, report_interval):
   tf.summary.image('Output', tf.expand_dims(output_logits, 3))
   tf.summary.image('Read_weightings', tf.expand_dims(output_read_weightings, 3))
   tf.summary.image('Write_weightings', tf.expand_dims(output_write_weightings, 3))
+  tf.summary.image('Mu', tf.expand_dims(output_mu, 3))
+  tf.summary.image('Rom_weight', tf.expand_dims(output_rom_weight, 3))
+  tf.summary.image('rom_mode', tf.expand_dims(output_rom_mode, 3))
   tf.summary.histogram('Loss', train_loss)
 
   merged = tf.summary.merge_all()

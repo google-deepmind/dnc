@@ -21,12 +21,15 @@ from __future__ import print_function
 import collections
 import sonnet as snt
 import tensorflow as tf
+import numpy as np
 
 from dnc import addressing
 from dnc import util
+from dnc import rom
 
+# I added rom_mode here because that is easier for testing
 AccessState = collections.namedtuple('AccessState', (
-    'memory', 'read_weights', 'write_weights', 'linkage', 'usage'))
+    'memory', 'read_weights', 'write_weights', 'mu', 'rom_weight', 'rom_mode', 'linkage', 'usage'))
 
 
 def _erase_and_write(memory, address, reset_weights, values):
@@ -110,6 +113,19 @@ class MemoryAccess(snt.RNNCore):
     self._linkage = addressing.TemporalLinkage(memory_size, num_writes)
     self._freeness = addressing.Freeness(memory_size)
 
+    # A test with a sequence of 5 vectors.
+    # For this test, the content of the rom is a vector with the PI interpolation, then mu
+    content = tf.constant([
+      [0, 0, 1, 1],
+      [0, 0, 1, 1],
+      [0, 0, 1, 1],
+      [0, 0, 1, 1],
+      [0, 0, 1, 0],
+    ], dtype='float32')
+
+    self._rom = rom.ROM(content)
+    self._mixer = rom.Mixer()
+
   def _build(self, inputs, prev_state):
     """Connects the MemoryAccess module into the graph.
 
@@ -123,7 +139,7 @@ class MemoryAccess(snt.RNNCore):
       `[batch_size, num_reads, word_size]`, and `next_state` is the new
       `AccessState` named tuple at the current time t.
     """
-    inputs = self._read_inputs(inputs)
+    inputs, mu, rom_weight = self._read_inputs(inputs, prev_state.rom_weight, prev_state.mu)
 
     # Update usage using inputs['free_gate'] and previous read & write weights.
     usage = self._freeness(
@@ -133,7 +149,7 @@ class MemoryAccess(snt.RNNCore):
         prev_usage=prev_state.usage)
 
     # Write to memory.
-    write_weights = self._write_weights(inputs, prev_state.memory, usage)
+    write_weights= self._write_weights(inputs, prev_state.memory, usage)
     memory = _erase_and_write(
         prev_state.memory,
         address=write_weights,
@@ -154,10 +170,14 @@ class MemoryAccess(snt.RNNCore):
         memory=memory,
         read_weights=read_weights,
         write_weights=write_weights,
+        mu=mu,
+        rom_weight=rom_weight,
+        rom_mode=inputs['rom_mode'],
         linkage=linkage_state,
-        usage=usage))
+        usage=usage),
+            inputs['read_mode'][:, 0, :])  # I added the read mode here temporarily for displaying it in tensorboard
 
-  def _read_inputs(self, inputs):
+  def _read_inputs(self, inputs, rom_weight, prev_mu):
     """Applies transformations to `inputs` to get control for this module."""
 
     def _linear(first_dim, second_dim, name, activation=None):
@@ -203,6 +223,23 @@ class MemoryAccess(snt.RNNCore):
     read_keys = _linear(self._num_reads, self._word_size, 'read_keys')
     read_strengths = snt.Linear(self._num_reads, name='read_strengths')(inputs)
 
+    rom_key = snt.Linear(self._rom.word_size(), name='rom_key')(inputs)
+    rom_strength = snt.Linear(1, name='rom_strength')(inputs)
+    rom_mode = snt.BatchApply(tf.nn.softmax)(snt.Linear(2)(inputs))
+    mu_controller = tf.sigmoid(
+      snt.Linear(1, name='mu_controller')(inputs))
+
+    # Hardcoded 1 adress
+    read_mode = read_mode[:, 0, :]
+
+    # Hier: read mode 'aanpassen' met rom en mixer
+    rom_word, rom_weight = self._rom(rom_key, rom_strength, rom_mode, rom_weight)
+    rom_read_mode = rom_word[:, 0:3]    # Hardcoded with one write head
+    mu_rom = tf.expand_dims(rom_word[:, 3], 1)
+
+    mixed_read_mode, new_mu = self._mixer(read_mode, rom_read_mode, mu_controller, mu_rom, prev_mu)
+    read_mode = tf.expand_dims(mixed_read_mode, 1)
+
     result = {
         'read_content_keys': read_keys,
         'read_content_strengths': read_strengths,
@@ -214,8 +251,12 @@ class MemoryAccess(snt.RNNCore):
         'allocation_gate': allocation_gate,
         'write_gate': write_gate,
         'read_mode': read_mode,
+        'rom_key': rom_key,
+        'rom_strength': rom_strength,
+        'rom_mode': rom_mode,
+        'mu': new_mu
     }
-    return result
+    return result, new_mu, rom_weight
 
   def _write_weights(self, inputs, memory, usage):
     """Calculates the memory locations to write to.
@@ -309,6 +350,9 @@ class MemoryAccess(snt.RNNCore):
         memory=tf.TensorShape([self._memory_size, self._word_size]),
         read_weights=tf.TensorShape([self._num_reads, self._memory_size]),
         write_weights=tf.TensorShape([self._num_writes, self._memory_size]),
+        mu=tf.TensorShape(1),
+        rom_weight=tf.TensorShape([self._rom.memory_size()]),
+        rom_mode=tf.TensorShape([2]),
         linkage=self._linkage.state_size,
         usage=self._freeness.state_size)
 

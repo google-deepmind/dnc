@@ -29,11 +29,10 @@ import tensorflow as tf
 
 from dnc import access
 
-DNCState = collections.namedtuple('DNCState', ('access_output', 'access_state',
-                                               'controller_state'))
+DNCState = collections.namedtuple('DNCState', ('access_output', 'access_state'))
 
 
-class DNC(snt.RNNCore):
+class DNCfeedforward(snt.RNNCore):
   """DNC core module.
 
   Contains controller and memory access module.
@@ -60,19 +59,24 @@ class DNC(snt.RNNCore):
       TypeError: if direct_input_size is not None for any access module other
         than KeyValueMemory.
     """
-    super(DNC, self).__init__(name=name)
+    super(DNCfeedforward, self).__init__(name=name)
 
     self._memory_size = access_config.get('memory_size')
-    # Two vectors + mu + 5 for the rom weights + 2 for the rom mode + 3 for the read mode
-    self._nb_extra_output = 2 * self._memory_size + 1 + 5 + 2 + 3
+    self._nb_extra_output = 2 * self._memory_size
 
     with self._enter_variable_scope():
-      self._controller = snt.LSTM(**controller_config)
+      self._controller = snt.Linear(
+        output_size=controller_config.get('hidden_size'),
+        name='controller'
+      ) #snt.LSTM(**controller_config)
       self._access = access.MemoryAccess(**access_config)
 
     self._access_output_size = np.prod(self._access.output_size.as_list())
     if return_weights:
-       output_size += self._nb_extra_output
+       output_size += self._nb_extra_output  # TODO make this memory size
+
+    print('output size:')
+    print(output_size)
 
     self._output_size = output_size
 
@@ -81,8 +85,7 @@ class DNC(snt.RNNCore):
     self._output_size = tf.TensorShape([output_size])
     self._state_size = DNCState(
         access_output=self._access_output_size,
-        access_state=self._access.state_size,
-        controller_state=self._controller.state_size)
+        access_state=self._access.state_size)
 
     self._return_weights = return_weights
 
@@ -111,25 +114,25 @@ class DNC(snt.RNNCore):
 
     prev_access_output = prev_state.access_output
     prev_access_state = prev_state.access_state
-    prev_controller_state = prev_state.controller_state
 
     batch_flatten = snt.BatchFlatten()
     controller_input = tf.concat(
         [batch_flatten(inputs), batch_flatten(prev_access_output)], 1)
 
-    controller_output, controller_state = self._controller(
-        controller_input, prev_controller_state)
+    controller_output = self._controller(
+        controller_input)
+
+    # Controller output: (batch_size, hidden_size) tensor.
 
     controller_output = self._clip_if_enabled(controller_output)
-    controller_state = tf.contrib.framework.nest.map_structure(self._clip_if_enabled, controller_state)
 
-    access_output, access_state, read_mode = self._access(controller_output,
+    access_output, access_state = self._access(controller_output,
                                                prev_access_state)
 
     output = tf.concat([controller_output, batch_flatten(access_output)], 1)
     output_size = self._output_size.as_list()[0]
     if self._return_weights:
-      output_size -= self._nb_extra_output
+      output_size -= self._nb_extra_output # TODO extract into variable
 
     output = snt.Linear(
         output_size=output_size,
@@ -140,22 +143,14 @@ class DNC(snt.RNNCore):
     read_weights = access_state.read_weights
 
     if self._return_weights:
-      output = tf.concat([output,
-                          read_weights[:, 0, :],
-                          write_weights[:, 0, :],
-                          access_state.mu,
-                          access_state.rom_weight,
-                          access_state.rom_mode,
-                          read_mode], 1)
+      output = tf.concat([output, read_weights[:, 0, :], write_weights[:, 0, :]], 1)
 
     return output, DNCState(
         access_output=access_output,
-        access_state=access_state,
-        controller_state=controller_state)
+        access_state=access_state)
 
   def initial_state(self, batch_size, dtype=tf.float32):
     return DNCState(
-        controller_state=self._controller.initial_state(batch_size, dtype),
         access_state=self._access.initial_state(batch_size, dtype),
         access_output=tf.zeros(
             [batch_size] + self._access.output_size.as_list(), dtype))
