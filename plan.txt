@@ -1,0 +1,19 @@
+Plan voor een volledig programma op de rom te zetten:
+Om het eerst geschreven adress te recoveren, 2 modes nodig:
+ - hardcoded mode: hardcoded adressen om te lezen en te schrijven
+   dan kunnen we de eerste en laatste adressen op hardcoded adressen lezen en schrijven
+   en daarna gewoon vooruit gaan in de temporal link
+ - parameter mode: parameters om adressen te berekenen aanpassen
+
+Nieuw plan: geen 2 aparte modes, elk veld heeft een bit die zegt of die moet gemixed worden of niet.
+
+De mode is de voorlaatste bit in een rom content: 0 is hardcoded, 1 is parameter mode.
+
+TODO
+ - Alle parameters op de rom content zetten. Hiervoor een helper klasse schrijven die het kan inlezen/uitlezen.
+   Dit zal alles wat vergemakkelijken in plaats van hardcoden de hele tijd.
+    - Helper klasse schrijven
+    - Access en ROM aanpassen:
+        - ROM aanpassen naar 2 methodes: 1 om mu te mixen, 1 om values te mixen
+        - Access: eerst mu mixen in het begin, dan die nieuwe value gebruiken om de andere parameters te mixen
+ - Volledig programma van lezen en schrijven testen

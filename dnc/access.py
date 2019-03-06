@@ -115,6 +115,8 @@ class MemoryAccess(snt.RNNCore):
 
     # A test with a sequence of 5 vectors.
     # For this test, the content of the rom is a vector with the PI interpolation, then mu
+
+    # TODO test with the full program on the ROM: first write away, then read everything
     content = tf.constant([
       [0, 0, 1, 1],
       [0, 0, 1, 1],
@@ -230,15 +232,15 @@ class MemoryAccess(snt.RNNCore):
       snt.Linear(1, name='mu_controller')(inputs))
 
     # Hardcoded 1 adress
-    read_mode = read_mode[:, 0, :]
+    first_head_read_mode = read_mode[:, 0, :]
 
     # Hier: read mode 'aanpassen' met rom en mixer
     rom_word, rom_weight = self._rom(rom_key, rom_strength, rom_mode, rom_weight)
     rom_read_mode = rom_word[:, 0:3]    # Hardcoded with one write head
     mu_rom = tf.expand_dims(rom_word[:, 3], 1)
 
-    mixed_read_mode, new_mu = self._mixer(read_mode, rom_read_mode, mu_controller, mu_rom, prev_mu)
-    read_mode = tf.expand_dims(mixed_read_mode, 1)
+    mixed_read_mode, new_mu = self._mixer(first_head_read_mode, rom_read_mode, mu_controller, mu_rom, prev_mu)
+    # read_mode = tf.expand_dims(mixed_read_mode, 1)
 
     result = {
         'read_content_keys': read_keys,
