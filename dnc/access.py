@@ -26,6 +26,7 @@ import numpy as np
 from dnc import addressing
 from dnc import util
 from dnc import rom
+from dnc import rom_content
 
 # I added rom_mode here because that is easier for testing
 AccessState = collections.namedtuple('AccessState', (
@@ -116,17 +117,34 @@ class MemoryAccess(snt.RNNCore):
     # A test with a sequence of 5 vectors.
     # For this test, the content of the rom is a vector with the PI interpolation, then mu
 
+    rom_factory = rom_content.ROMContentFactory(memory_size, word_size)
+
     # TODO test with the full program on the ROM: first write away, then read everything
+    # content = tf.constant([
+    #   [0, 0, 1, 1],
+    #   [0, 0, 1, 1],
+    #   [0, 0, 1, 1],
+    #   [0, 0, 1, 1],
+    #   [0, 0, 1, 0],
+    # ], dtype='float32')
+
+    address = [0] * memory_size
+    address[0] = 1
+
     content = tf.constant([
-      [0, 0, 1, 1],
-      [0, 0, 1, 1],
-      [0, 0, 1, 1],
-      [0, 0, 1, 1],
-      [0, 0, 1, 0],
+      rom_factory.create_content({'write_gate': 1, 'write_address': address}, 1),
+      rom_factory.create_content({'allocation_gate': 1, 'write_gate': 1}, 1),
+      rom_factory.create_content({'allocation_gate': 1, 'write_gate': 1}, 1),
+      rom_factory.create_content({'allocation_gate': 1, 'write_gate': 1}, 1),
+      rom_factory.create_content({'read_address': address, 'write_gate': 0, 'read_mode': [0, 1, 0]}, 1),
+      rom_factory.create_content({'write_gate': 0, 'read_mode': [0, 0, 1]}, 1),
+      rom_factory.create_content({'write_gate': 0, 'read_mode': [0, 0, 1]}, 1),
+      rom_factory.create_content({'write_gate': 0, 'read_mode': [0, 0, 1]}, 0),
     ], dtype='float32')
 
     self._rom = rom.ROM(content)
     self._mixer = rom.Mixer()
+    self._rom_reader = rom_factory
 
   def _build(self, inputs, prev_state):
     """Connects the MemoryAccess module into the graph.
