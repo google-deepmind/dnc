@@ -10,10 +10,18 @@ Nieuw plan: geen 2 aparte modes, elk veld heeft een bit die zegt of die moet gem
 De mode is de voorlaatste bit in een rom content: 0 is hardcoded, 1 is parameter mode.
 
 TODO
+  huidige status: reading van rom_content in batch mode. Maak een methode die voor alles een tensor returnet, de mixer
+  kan hier dan mee overweg..
+  of even gewoon tensorflow laten evalueren, speed zal slecht zijn maar wel veel makkelijker
+
+TODO
  - Alle parameters op de rom content zetten. Hiervoor een helper klasse schrijven die het kan inlezen/uitlezen.
    Dit zal alles wat vergemakkelijken in plaats van hardcoden de hele tijd.
     - Helper klasse schrijven
     - Access en ROM aanpassen:
         - ROM aanpassen naar 2 methodes: 1 om mu te mixen, 1 om values te mixen
         - Access: eerst mu mixen in het begin, dan die nieuwe value gebruiken om de andere parameters te mixen
+    - Van de rom een soort hashmap maken, in plaats van keys die op de content zitten
+      Als alle niet-interessante plaatsen dan dezelfde key hebben (bvb zeros), dan worden die sowieso niet geaddresseerd
+      want dan krijg je nooit een one-hot weighting
  - Volledig programma van lezen en schrijven testen
