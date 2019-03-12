@@ -131,16 +131,16 @@ class MemoryAccess(snt.RNNCore):
     address = [0] * memory_size
     address[0] = 1
 
-    content = tf.constant([
-      rom_factory.create_content({'write_gate': 1, 'write_address': address}, 1),
-      rom_factory.create_content({'allocation_gate': 1, 'write_gate': 1}, 1),
-      rom_factory.create_content({'allocation_gate': 1, 'write_gate': 1}, 1),
-      rom_factory.create_content({'allocation_gate': 1, 'write_gate': 1}, 1),
-      rom_factory.create_content({'read_address': address, 'write_gate': 0, 'read_mode': [0, 1, 0]}, 1),
-      rom_factory.create_content({'write_gate': 0, 'read_mode': [0, 0, 1]}, 1),
-      rom_factory.create_content({'write_gate': 0, 'read_mode': [0, 0, 1]}, 1),
-      rom_factory.create_content({'write_gate': 0, 'read_mode': [0, 0, 1]}, 0),
-    ], dtype='float32')
+    content = tf.constant([content.to_array() for content in [
+      rom_factory.create_content({'write_gate': [1], 'write_address': address}, 1),
+      rom_factory.create_content({'allocation_gate': [1], 'write_gate': [1]}, 1),
+      rom_factory.create_content({'allocation_gate': [1], 'write_gate': [1]}, 1),
+      rom_factory.create_content({'allocation_gate': [1], 'write_gate': [1]}, 1),
+      rom_factory.create_content({'read_address': address, 'write_gate': [0], 'read_mode': [0, 1, 0]}, 1),
+      rom_factory.create_content({'write_gate': [0], 'read_mode': [0, 0, 1]}, 1),
+      rom_factory.create_content({'write_gate': [0], 'read_mode': [0, 0, 1]}, 1),
+      rom_factory.create_content({'write_gate': [0], 'read_mode': [0, 0, 1]}, 0),
+    ]], dtype='float32')
 
     self._rom = rom.ROM(content)
     self._mixer = rom.Mixer()
@@ -192,12 +192,13 @@ class MemoryAccess(snt.RNNCore):
         write_weights=write_weights,
         mu=mu,
         rom_weight=rom_weight,
-        rom_mode=inputs['rom_mode'],
+        rom_mode=inputs['rom_mode'], # TODO remove unneeded rom_mode from state
         linkage=linkage_state,
         usage=usage),
             inputs['read_mode'][:, 0, :])  # I added the read mode here temporarily for displaying it in tensorboard
 
-  def _read_inputs(self, inputs, rom_weight, prev_mu):
+  # TODO make sure prev_mu is initialized to 0
+  def _read_inputs(self, inputs, prev_rom_weight, prev_mu):
     """Applies transformations to `inputs` to get control for this module."""
 
     def _linear(first_dim, second_dim, name, activation=None):
@@ -249,16 +250,26 @@ class MemoryAccess(snt.RNNCore):
     mu_controller = tf.sigmoid(
       snt.Linear(1, name='mu_controller')(inputs))
 
-    # Hardcoded 1 adress
-    first_head_read_mode = read_mode[:, 0, :]
-
-    # Hier: read mode 'aanpassen' met rom en mixer
-    rom_word, rom_weight = self._rom(rom_key, rom_strength, rom_mode, rom_weight)
-    rom_read_mode = rom_word[:, 0:3]    # Hardcoded with one write head
+    # Read rom contents
+    rom_word, rom_weight = self._rom(rom_key, rom_strength, rom_mode, prev_rom_weight)
+    # rom_word is batch_size x
+    # TODO read in batch + map to content for easy processing
+    rom_word_dict = self._rom_reader.read_rom_batch_tensor(rom_word).content
     mu_rom = tf.expand_dims(rom_word[:, 3], 1)
 
-    mixed_read_mode, new_mu = self._mixer(first_head_read_mode, rom_read_mode, mu_controller, mu_rom, prev_mu)
-    # read_mode = tf.expand_dims(mixed_read_mode, 1)
+    # Update mu
+    new_mu = self._mixer(mu_controller, mu_rom, prev_mu)
+
+    # MIXER: read mode
+    first_head_read_mode = read_mode[:, 0, :]
+    mixed_read_mode = self._mixer(first_head_read_mode, rom_word_dict['read_mode'], new_mu)
+    read_mode = tf.expand_dims(mixed_read_mode, 1)
+
+    print('ASDFASDFASDFASDF')
+    print(allocation_gate)
+
+    # MIXER: allocation gate
+    # first_head_allocation_gate = allocation_gate[]
 
     result = {
         'read_content_keys': read_keys,
@@ -271,10 +282,12 @@ class MemoryAccess(snt.RNNCore):
         'allocation_gate': allocation_gate,
         'write_gate': write_gate,
         'read_mode': read_mode,
-        'rom_key': rom_key,
-        'rom_strength': rom_strength,
-        'rom_mode': rom_mode,
-        'mu': new_mu
+        # 'rom_key': rom_key,
+        # 'rom_strength': rom_strength,
+        # 'rom_mode': rom_mode,
+        'mu': new_mu,
+        'rom_read_address': rom_word_dict['read_address'],
+        'rom_write_address': rom_word_dict['write_address']
     }
     return result, new_mu, rom_weight
 
