@@ -192,7 +192,7 @@ class MemoryAccess(snt.RNNCore):
         write_weights=write_weights,
         mu=mu,
         rom_weight=rom_weight,
-        rom_mode=inputs['rom_mode'], # TODO remove unneeded rom_mode from state
+        rom_mode=inputs['rom_mode'], # rom mode is needed for debugging purposes (we output it from the network)
         linkage=linkage_state,
         usage=usage),
             inputs['read_mode'][:, 0, :])  # I added the read mode here temporarily for displaying it in tensorboard
@@ -253,23 +253,36 @@ class MemoryAccess(snt.RNNCore):
     # Read rom contents
     rom_word, rom_weight = self._rom(rom_key, rom_strength, rom_mode, prev_rom_weight)
     # rom_word is batch_size x l
-    # TODO read in batch + map to content for easy processing
     rom_word_dict = self._rom_reader.read_rom_batch_tensor(rom_word)
     mu_rom = rom_word_dict['mu']
 
     # Update mu
-    new_mu = tf.squeeze(self._mixer(mu_controller, mu_rom, prev_mu), 1) # Squeeze away the first dimension
+    batch_size = tf.shape(mu_rom)[0]
+    new_mu_usage = tf.ones([batch_size, 1])  # Usage is always one for mu
+    new_mu = self._mixer(mu_controller, mu_rom, new_mu_usage, prev_mu)
+
+    # TODO lots of duplication here, extract into a method on the rom
 
     # MIXER: read mode
     first_head_read_mode = read_mode[:, 0, :]
-    mixed_read_mode = self._mixer(first_head_read_mode, rom_word_dict['read_mode'], new_mu)
+    rom_read_mode_usage = rom_word_dict['read_mode'][:, 0:1]
+    rom_read_mode = rom_word_dict['read_mode'][:, 1:]
+    mixed_read_mode = self._mixer(first_head_read_mode, rom_read_mode, new_mu, rom_read_mode_usage)
     read_mode = tf.expand_dims(mixed_read_mode, 1)
 
-    print('ASDFASDFASDFASDF')
-    print(allocation_gate)
-
     # MIXER: allocation gate
-    # first_head_allocation_gate = allocation_gate[]
+    first_head_allocation_gate = allocation_gate[:, 0, :]
+    rom_allocation_gate_usage = rom_word_dict['allocation_gate'][:, 0:1]
+    rom_allocation_gate = rom_word_dict['allocation_gate'][:, 1:]
+    mixed_allocation_gate = self._mixer(first_head_allocation_gate, rom_allocation_gate, new_mu, rom_allocation_gate_usage)
+    allocation_gate = tf.expand_dims(mixed_allocation_gate, 1)
+
+    # MIXER: write gate
+    first_head_write_gate = write_gate[:, 0, :]
+    rom_write_gate_usage = rom_word_dict['write_gate'][:, 0:1]
+    rom_write_gate = rom_word_dict['write_gate'][:, 1:]
+    mixed_write_gate = self._mixer(first_head_write_gate, rom_write_gate, new_mu, rom_write_gate_usage)
+    write_gate = tf.expand_dims(mixed_write_gate, 1)
 
     result = {
         'read_content_keys': read_keys,
@@ -283,8 +296,8 @@ class MemoryAccess(snt.RNNCore):
         'write_gate': write_gate,
         'read_mode': read_mode,
         # 'rom_key': rom_key,
-        # 'rom_strength': rom_strength,
-        # 'rom_mode': rom_mode,
+        # 'rom_strength': rom_strength, # Maybe later add these, could be useful for debugging
+        'rom_mode': rom_mode,
         'mu': new_mu,
         'rom_read_address': rom_word_dict['read_address'],
         'rom_write_address': rom_word_dict['write_address']
@@ -326,9 +339,19 @@ class MemoryAccess(snt.RNNCore):
       allocation_gate = tf.expand_dims(inputs['allocation_gate'], -1)
       write_gate = tf.expand_dims(inputs['write_gate'], -1)
 
-      # w_t^{w, i} - The write weightings for each write head.
-      return write_gate * (allocation_gate * write_allocation_weights +
+      write_weights = write_gate * (allocation_gate * write_allocation_weights +
                            (1 - allocation_gate) * write_content_weights)
+
+      # MIXER: write_weights
+      first_head_write_weight = write_weights[:, 0, :]
+      rom_write_weight_usage = inputs['rom_write_weight'][:, 0:1]
+      rom_write_weight = inputs['rom_write_weight'][:, 1:]
+      mixed_write_weight = self._mixer(first_head_write_weight, rom_write_weight, inputs['mu'], rom_write_weight_usage)
+
+      write_weights = tf.expand_dims(mixed_write_weight, 1)
+
+      # w_t^{w, i} - The write weightings for each write head.
+      return write_weights
 
   def _read_weights(self, inputs, memory, prev_read_weights, link):
     """Calculates read weights for each read head.
@@ -373,6 +396,14 @@ class MemoryAccess(snt.RNNCore):
           tf.expand_dims(content_mode, 2) * content_weights + tf.reduce_sum(
               tf.expand_dims(forward_mode, 3) * forward_weights, 2) +
           tf.reduce_sum(tf.expand_dims(backward_mode, 3) * backward_weights, 2))
+
+      # MIXER: read_weights
+      first_head_read_weight = read_weights[:, 0, :]
+      rom_read_weight_usage = inputs['rom_read_weight'][:, 0:1]
+      rom_read_weight = inputs['rom_read_weight'][:, 1:]
+      mixed_read_weight = self._mixer(first_head_read_weight, rom_read_weight, inputs['mu'], rom_read_weight_usage)
+
+      read_weights = tf.expand_dims(mixed_read_weight, 1)
 
       return read_weights
 

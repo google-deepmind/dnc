@@ -59,15 +59,15 @@ class Mixer(snt.AbstractModule):
   def __init__(self, name='Mixer'):
     super(Mixer, self).__init__(name=name)
 
-  # mu is expected to be a 1d array of length batch_size
+  # mu is expected to be a 1d array of length batch_size x 1
   # value_controller and value_rom expected to be batch_size x l
-  # the used parameter specifies if the value is used on the rom. 1d array of length batch_size
+  # the used parameter specifies if the value is used on the rom. 1d array of length batch_size x 1
   def _build(self, value_controller, value_rom, mu, used):
     batch_size = tf.shape(mu)[0]
     word_size = tf.shape(value_controller)[1]
 
-    tiled_mu = tf.tile(tf.expand_dims(mu, 1), [1, word_size])
-    tiled_used = tf.tile(tf.expand_dims(used, 1), [1, word_size])
+    tiled_mu = tf.tile(mu, [1, word_size])
+    tiled_used = tf.tile(used, [1, word_size])
 
     z = tiled_mu * tiled_used # Can experiment with different functions here
 
