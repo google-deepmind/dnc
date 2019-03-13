@@ -59,29 +59,22 @@ class Mixer(snt.AbstractModule):
   def __init__(self, name='Mixer'):
     super(Mixer, self).__init__(name=name)
 
-  # Recurrent, because mu depends on previous mu.
-  # Returns the mixed value.
-  # 1-D vectors for mu: [batch_size].
-  def _build(self, value_controller, value_rom, mu_controller, mu_rom, prev_mu):
-    batch_size = tf.shape(mu_controller)[0]
+  # mu is expected to be a 1d array of length batch_size
+  # value_controller and value_rom expected to be batch_size x l
+  # the used parameter specifies if the value is used on the rom. 1d array of length batch_size
+  def _build(self, value_controller, value_rom, mu, used):
+    batch_size = tf.shape(mu)[0]
     word_size = tf.shape(value_controller)[1]
 
-    mu_controller = mu_controller[:, 0]
-    mu_rom = mu_rom[:, 0]
-    prev_mu = prev_mu[:, 0]
+    tiled_mu = tf.tile(tf.expand_dims(mu, 1), [1, word_size])
+    tiled_used = tf.tile(tf.expand_dims(used, 1), [1, word_size])
 
-    # mu = prev_mu * mu_rom + (1 - prev_mu) * mu_controller
-    mu = tf.expand_dims(
-      tf.add(
-        tf.multiply(prev_mu, mu_rom),
-        tf.multiply(tf.subtract(tf.tile(tf.constant([1], dtype='float32'), [batch_size]), prev_mu), mu_controller)),
-      1)
+    z = tiled_mu * tiled_used # Can experiment with different functions here
 
     # value = mu * value_rom + (1 - mu) * value_controller
-    tiled_mu = tf.tile(mu, [1, word_size])
     value = tf.add(
-      tf.multiply(tiled_mu, value_rom),
-      tf.multiply(tf.subtract(tf.ones([batch_size, word_size], dtype='float32'), tiled_mu), value_controller))
+      tf.multiply(z, value_rom),
+      tf.multiply(tf.subtract(tf.ones([batch_size, word_size], dtype='float32'), z), value_controller)
+    )
 
-    return value, mu
-
+    return value

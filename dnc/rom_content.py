@@ -23,7 +23,7 @@ class ROMContentFactory:
   def read_rom_batch_tensor(self, batch_tensor):
     shape = tf.shape(batch_tensor)
     mu_tensor = batch_tensor[:, 0]
-    result = {}
+    result = {'mu': mu_tensor}
 
     index = 1
     for key in self.keys:

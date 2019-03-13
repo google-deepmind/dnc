@@ -252,13 +252,13 @@ class MemoryAccess(snt.RNNCore):
 
     # Read rom contents
     rom_word, rom_weight = self._rom(rom_key, rom_strength, rom_mode, prev_rom_weight)
-    # rom_word is batch_size x
+    # rom_word is batch_size x l
     # TODO read in batch + map to content for easy processing
-    rom_word_dict = self._rom_reader.read_rom_batch_tensor(rom_word).content
-    mu_rom = tf.expand_dims(rom_word[:, 3], 1)
+    rom_word_dict = self._rom_reader.read_rom_batch_tensor(rom_word)
+    mu_rom = rom_word_dict['mu']
 
     # Update mu
-    new_mu = self._mixer(mu_controller, mu_rom, prev_mu)
+    new_mu = tf.squeeze(self._mixer(mu_controller, mu_rom, prev_mu), 1) # Squeeze away the first dimension
 
     # MIXER: read mode
     first_head_read_mode = read_mode[:, 0, :]
