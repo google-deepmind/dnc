@@ -10,9 +10,8 @@ Nieuw plan: geen 2 aparte modes, elk veld heeft een bit die zegt of die moet gem
 De mode is de voorlaatste bit in een rom content: 0 is hardcoded, 1 is parameter mode.
 
 TODO
-  huidige status: reading van rom_content in batch mode. Maak een methode die voor alles een tensor returnet, de mixer
-  kan hier dan mee overweg..
-  of even gewoon tensorflow laten evalueren, speed zal slecht zijn maar wel veel makkelijker
+  Huidige status: helpers geimplementeerd, nu nog de rom read key fixen (pak keysize 1 om te beginnen, maak het dynamisch)
+  Daarna is checken of het kan getraind worden
 
 TODO
  - Alle parameters op de rom content zetten. Hiervoor een helper klasse schrijven die het kan inlezen/uitlezen.

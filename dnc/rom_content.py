@@ -6,13 +6,13 @@ class ROMContentFactory:
   address_length: int representing how long addresses are
   word_size: int representing how long a word on the memory matrix is
   """
-  def __init__(self, address_length, _word_size):
+  def __init__(self, memory_size, _word_size):
     self.defaults = {
       'allocation_gate': 1,
       'write_gate': 1,
       'read_mode': 3,
-      'read_address': address_length,
-      'write_address': address_length,
+      'read_weight': memory_size,
+      'write_weight': memory_size,
     }
     self.keys = sorted(self.defaults.keys())
 

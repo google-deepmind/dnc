@@ -128,15 +128,15 @@ class MemoryAccess(snt.RNNCore):
     #   [0, 0, 1, 0],
     # ], dtype='float32')
 
-    address = [0] * memory_size
-    address[0] = 1
+    weighting = [0] * memory_size
+    weighting[0] = 1
 
     content = tf.constant([content.to_array() for content in [
-      rom_factory.create_content({'write_gate': [1], 'write_address': address}, 1),
+      rom_factory.create_content({'write_gate': [1], 'write_weight': weighting}, 1),
       rom_factory.create_content({'allocation_gate': [1], 'write_gate': [1]}, 1),
       rom_factory.create_content({'allocation_gate': [1], 'write_gate': [1]}, 1),
       rom_factory.create_content({'allocation_gate': [1], 'write_gate': [1]}, 1),
-      rom_factory.create_content({'read_address': address, 'write_gate': [0], 'read_mode': [0, 1, 0]}, 1),
+      rom_factory.create_content({'read_weight': weighting, 'write_gate': [0], 'read_mode': [0, 1, 0]}, 1),
       rom_factory.create_content({'write_gate': [0], 'read_mode': [0, 0, 1]}, 1),
       rom_factory.create_content({'write_gate': [0], 'read_mode': [0, 0, 1]}, 1),
       rom_factory.create_content({'write_gate': [0], 'read_mode': [0, 0, 1]}, 0),
@@ -271,18 +271,16 @@ class MemoryAccess(snt.RNNCore):
     read_mode = tf.expand_dims(mixed_read_mode, 1)
 
     # MIXER: allocation gate
-    first_head_allocation_gate = allocation_gate[:, 0, :]
+    first_head_allocation_gate = allocation_gate
     rom_allocation_gate_usage = rom_word_dict['allocation_gate'][:, 0:1]
     rom_allocation_gate = rom_word_dict['allocation_gate'][:, 1:]
-    mixed_allocation_gate = self._mixer(first_head_allocation_gate, rom_allocation_gate, new_mu, rom_allocation_gate_usage)
-    allocation_gate = tf.expand_dims(mixed_allocation_gate, 1)
+    allocation_gate = self._mixer(first_head_allocation_gate, rom_allocation_gate, new_mu, rom_allocation_gate_usage)
 
     # MIXER: write gate
-    first_head_write_gate = write_gate[:, 0, :]
+    first_head_write_gate = write_gate
     rom_write_gate_usage = rom_word_dict['write_gate'][:, 0:1]
     rom_write_gate = rom_word_dict['write_gate'][:, 1:]
-    mixed_write_gate = self._mixer(first_head_write_gate, rom_write_gate, new_mu, rom_write_gate_usage)
-    write_gate = tf.expand_dims(mixed_write_gate, 1)
+    write_gate = self._mixer(first_head_write_gate, rom_write_gate, new_mu, rom_write_gate_usage)
 
     result = {
         'read_content_keys': read_keys,
@@ -299,8 +297,8 @@ class MemoryAccess(snt.RNNCore):
         # 'rom_strength': rom_strength, # Maybe later add these, could be useful for debugging
         'rom_mode': rom_mode,
         'mu': new_mu,
-        'rom_read_address': rom_word_dict['read_address'],
-        'rom_write_address': rom_word_dict['write_address']
+        'rom_read_weight': rom_word_dict['read_weight'],
+        'rom_write_weight': rom_word_dict['write_weight']
     }
     return result, new_mu, rom_weight
 
