@@ -13,14 +13,15 @@ from dnc import addressing
 class ROM(snt.AbstractModule):
   def __init__(self,
                content,
+               key_size,
                name='ROM'):
     super(ROM, self).__init__(name=name)
     self._content = content
     self._memory_size = tf.shape(content)[0]  # make one op of these two
-    self._word_size = tf.shape(content)[1]
+    self._key_size = key_size
 
     self._read_content_weight_mod = addressing.CosineWeights(
-        1, self._word_size, name='read_content_weights')
+        1, key_size, name='read_content_weights')
 
   # Recurrent, because readings of the mode depend on the previous read weight
   # Input is batch major
@@ -31,7 +32,7 @@ class ROM(snt.AbstractModule):
     content = tf.tile(tf.expand_dims(self._content, 0), [batch_size, 1, 1])
     # Expand dims is because the cosineweights is defined for multiple heads at once but we only have 1
     content_weight = self._read_content_weight_mod(
-      content, tf.expand_dims(read_key, 1), read_strength
+      content[:, :, 0:self._key_size], tf.expand_dims(read_key, 1), read_strength   # TODO check that this content indices are correct
     )[:, 0, :]
 
     forward_weight = self._forward_read_weight(prev_read_weight)
@@ -51,6 +52,9 @@ class ROM(snt.AbstractModule):
 
   def word_size(self):
     return self._content.get_shape().as_list()[1]
+
+  def key_size(self):
+    return self._key_size
 
   def memory_size(self):
     return self._content.get_shape().as_list()[0]

@@ -24,3 +24,6 @@ TODO
       Als alle niet-interessante plaatsen dan dezelfde key hebben (bvb zeros), dan worden die sowieso niet geaddresseerd
       want dan krijg je nooit een one-hot weighting
  - Volledig programma van lezen en schrijven testen
+
+IDEE
+ - de read_mode van de rom altijd op next zetten wanneer mu 1 is

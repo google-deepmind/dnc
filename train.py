@@ -103,6 +103,9 @@ def train(num_training_iterations, report_interval):
   #                                  FLAGS.min_length, FLAGS.max_length,
   #                                  FLAGS.min_repeats, FLAGS.max_repeats)
 
+  # Eager execution, for printing
+  # tf.enable_eager_execution()
+
   dataset = repeat_sequence.RepeatSequence(5, 5, 7, FLAGS.batch_size)
 
   dataset_tensors = dataset()
@@ -113,8 +116,9 @@ def train(num_training_iterations, report_interval):
   output_read_weightings = output_concat[:, :, dataset.target_size:(dataset.target_size+FLAGS.memory_size)]
   output_write_weightings = output_concat[:, :, (dataset.target_size+FLAGS.memory_size):(dataset.target_size+2*FLAGS.memory_size)]
   output_mu = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size):(dataset.target_size+2*FLAGS.memory_size+1)]
-  output_rom_weight = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1):(dataset.target_size+2*FLAGS.memory_size+6)]
-  output_rom_mode = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+6):]
+  output_rom_weight = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1):(dataset.target_size+2*FLAGS.memory_size+1+8)]
+  output_rom_mode = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1+8):(dataset.target_size+2*FLAGS.memory_size+1+8+2)]
+  output_read_mode = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1+8+2):]
 
   # Used for visualization.
   # output = tf.round(
@@ -137,6 +141,7 @@ def train(num_training_iterations, report_interval):
   tf.summary.image('Mu', tf.expand_dims(output_mu, 3))
   tf.summary.image('Rom_weight', tf.expand_dims(output_rom_weight, 3))
   tf.summary.image('rom_mode', tf.expand_dims(output_rom_mode, 3))
+  tf.summary.image('read_mode', tf.expand_dims(output_read_mode, 3))
   tf.summary.histogram('Loss', train_loss)
 
   merged = tf.summary.merge_all()

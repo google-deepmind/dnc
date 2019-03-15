@@ -114,35 +114,25 @@ class MemoryAccess(snt.RNNCore):
     self._linkage = addressing.TemporalLinkage(memory_size, num_writes)
     self._freeness = addressing.Freeness(memory_size)
 
-    # A test with a sequence of 5 vectors.
-    # For this test, the content of the rom is a vector with the PI interpolation, then mu
-
-    rom_factory = rom_content.ROMContentFactory(memory_size, word_size)
-
-    # TODO test with the full program on the ROM: first write away, then read everything
-    # content = tf.constant([
-    #   [0, 0, 1, 1],
-    #   [0, 0, 1, 1],
-    #   [0, 0, 1, 1],
-    #   [0, 0, 1, 1],
-    #   [0, 0, 1, 0],
-    # ], dtype='float32')
+    # Key size of 1
+    key_size = 1
+    rom_factory = rom_content.ROMContentFactory(key_size, memory_size, word_size)
 
     weighting = [0] * memory_size
     weighting[0] = 1
 
     content = tf.constant([content.to_array() for content in [
-      rom_factory.create_content({'write_gate': [1], 'write_weight': weighting}, 1),
-      rom_factory.create_content({'allocation_gate': [1], 'write_gate': [1]}, 1),
-      rom_factory.create_content({'allocation_gate': [1], 'write_gate': [1]}, 1),
-      rom_factory.create_content({'allocation_gate': [1], 'write_gate': [1]}, 1),
-      rom_factory.create_content({'read_weight': weighting, 'write_gate': [0], 'read_mode': [0, 1, 0]}, 1),
-      rom_factory.create_content({'write_gate': [0], 'read_mode': [0, 0, 1]}, 1),
-      rom_factory.create_content({'write_gate': [0], 'read_mode': [0, 0, 1]}, 1),
-      rom_factory.create_content({'write_gate': [0], 'read_mode': [0, 0, 1]}, 0),
+      rom_factory.create_content([1], {'write_gate': [1], 'write_weight': weighting}, 1),
+      rom_factory.create_content([0], {'allocation_gate': [1], 'write_gate': [1]}, 1),
+      rom_factory.create_content([0], {'allocation_gate': [1], 'write_gate': [1]}, 1),
+      rom_factory.create_content([0], {'allocation_gate': [1], 'write_gate': [1]}, 1),
+      rom_factory.create_content([0], {'read_weight': weighting, 'write_gate': [0], 'read_mode': [0, 1, 0]}, 1),
+      rom_factory.create_content([0], {'write_gate': [0], 'read_mode': [0, 0, 1]}, 1),
+      rom_factory.create_content([0], {'write_gate': [0], 'read_mode': [0, 0, 1]}, 1),
+      rom_factory.create_content([0], {'write_gate': [0], 'read_mode': [0, 0, 1]}, 0),
     ]], dtype='float32')
 
-    self._rom = rom.ROM(content)
+    self._rom = rom.ROM(content, key_size)
     self._mixer = rom.Mixer()
     self._rom_reader = rom_factory
 
@@ -159,7 +149,7 @@ class MemoryAccess(snt.RNNCore):
       `[batch_size, num_reads, word_size]`, and `next_state` is the new
       `AccessState` named tuple at the current time t.
     """
-    inputs, mu, rom_weight = self._read_inputs(inputs, prev_state.rom_weight, prev_state.mu)
+    inputs, rom_weight = self._read_inputs(inputs, prev_state.rom_weight, prev_state.mu)
 
     # Update usage using inputs['free_gate'] and previous read & write weights.
     usage = self._freeness(
@@ -190,7 +180,7 @@ class MemoryAccess(snt.RNNCore):
         memory=memory,
         read_weights=read_weights,
         write_weights=write_weights,
-        mu=mu,
+        mu=inputs['mu'],
         rom_weight=rom_weight,
         rom_mode=inputs['rom_mode'], # rom mode is needed for debugging purposes (we output it from the network)
         linkage=linkage_state,
@@ -244,9 +234,12 @@ class MemoryAccess(snt.RNNCore):
     read_keys = _linear(self._num_reads, self._word_size, 'read_keys')
     read_strengths = snt.Linear(self._num_reads, name='read_strengths')(inputs)
 
-    rom_key = snt.Linear(self._rom.word_size(), name='rom_key')(inputs)
+    # Important: we assume here that keys are between 0 and 1
+    rom_key = tf.sigmoid(
+      snt.Linear(self._rom.key_size(), name='rom_key')(inputs))
     rom_strength = snt.Linear(1, name='rom_strength')(inputs)
-    rom_mode = snt.BatchApply(tf.nn.softmax)(snt.Linear(2)(inputs))
+    # rom_mode = snt.BatchApply(tf.nn.softmax)(snt.Linear(2)(inputs))
+    rom_mode = tf.map_fn(tf.nn.softmax, snt.Linear(2)(inputs))
     mu_controller = tf.sigmoid(
       snt.Linear(1, name='mu_controller')(inputs))
 
@@ -256,10 +249,25 @@ class MemoryAccess(snt.RNNCore):
     rom_word_dict = self._rom_reader.read_rom_batch_tensor(rom_word)
     mu_rom = rom_word_dict['mu']
 
+    # tf.print('rom_weight')
+    # tf.print(rom_weight)
+    # tf.print('rom_key')
+    # tf.print(rom_key)
+    # tf.print('rom_mode')
+    # tf.print(rom_mode)
+    # tf.print('rom_strength')
+    # tf.print(rom_strength)
+    # tf.print('prev_rom_weight')
+    # tf.print(prev_rom_weight)
+    # tf.print('rom_word')
+    # tf.print(rom_word)
+    # tf.print('mu rom')
+    # tf.print(mu_rom)
+
     # Update mu
     batch_size = tf.shape(mu_rom)[0]
     new_mu_usage = tf.ones([batch_size, 1])  # Usage is always one for mu
-    new_mu = self._mixer(mu_controller, mu_rom, new_mu_usage, prev_mu)
+    new_mu = self._mixer(mu_controller, mu_rom, prev_mu, new_mu_usage)
 
     # TODO lots of duplication here, extract into a method on the rom
 
@@ -300,7 +308,7 @@ class MemoryAccess(snt.RNNCore):
         'rom_read_weight': rom_word_dict['read_weight'],
         'rom_write_weight': rom_word_dict['write_weight']
     }
-    return result, new_mu, rom_weight
+    return result, rom_weight
 
   def _write_weights(self, inputs, memory, usage):
     """Calculates the memory locations to write to.
