@@ -14,6 +14,7 @@ class ROMContentFactory:
       'read_mode': 3,
       'read_weight': memory_size,
       'write_weight': memory_size,
+      'next_rom_mode': 2
     }
     self.key_size = key_size
     self.keys = sorted(self.defaults.keys())

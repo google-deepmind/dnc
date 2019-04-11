@@ -69,7 +69,10 @@ class Mixer(snt.AbstractModule):
   def _build(self, value_controller, value_rom, mu, used):
     batch_size = tf.shape(mu)[0]
     word_size = tf.shape(value_controller)[1]
-
+    print('Word size: ')
+    print(word_size)
+    print('Mu: ')
+    print(mu)
     tiled_mu = tf.tile(mu, [1, word_size])
     tiled_used = tf.tile(used, [1, word_size])
 

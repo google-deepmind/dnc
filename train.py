@@ -44,7 +44,7 @@ tf.flags.DEFINE_float("optimizer_epsilon", 1e-10,
                       "Epsilon used for RMSProp optimizer.")
 
 # Task parameters
-tf.flags.DEFINE_integer("batch_size", 16, "Batch size for training.")
+tf.flags.DEFINE_integer("batch_size", 15, "Batch size for training.")
 tf.flags.DEFINE_integer("num_bits", 4, "Dimensionality of each vector to copy")
 tf.flags.DEFINE_integer(
     "min_length", 1,
@@ -104,7 +104,7 @@ def train(num_training_iterations, report_interval):
   #                                  FLAGS.min_repeats, FLAGS.max_repeats)
 
   # Eager execution, for printing
-  # tf.enable_eager_execution()
+  tf.enable_eager_execution()
 
   dataset = repeat_sequence.RepeatSequence(5, 5, 7, FLAGS.batch_size)
 
@@ -125,11 +125,6 @@ def train(num_training_iterations, report_interval):
   #     tf.expand_dims(dataset_tensors.mask, -1) * tf.sigmoid(output_logits))
 
   output = tf.round(tf.sigmoid(output_logits))
-
-  print('Target: ')
-  print(dataset_tensors.target)
-  print('\nLogits: ')
-  print(output_logits)
 
   train_loss = dataset.cost(output_logits, dataset_tensors.target)
 

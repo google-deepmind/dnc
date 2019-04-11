@@ -27,3 +27,7 @@ TODO
 
 IDEE
  - de read_mode van de rom altijd op next zetten wanneer mu 1 is
+
+TODO 28/3
+ - Probeer overriden van initial_state gedefinieerd in rnncore: is dit random? is dit zeros? probeer de juiste initial state te geven
+ - Niet vergeten: prev_rom_mode en usage in de state steken (deze wordt gelezen van de rom zelf)
