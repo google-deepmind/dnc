@@ -150,8 +150,6 @@ class MemoryAccess(snt.RNNCore):
       `[batch_size, num_reads, word_size]`, and `next_state` is the new
       `AccessState` named tuple at the current time t.
     """
-    print('write_weights:')
-    print(prev_state.write_weights)
     inputs, rom_weight = self._read_inputs(inputs,
                                            prev_state.rom_weight,
                                            prev_state.mu,
@@ -219,9 +217,6 @@ class MemoryAccess(snt.RNNCore):
     free_gate = tf.sigmoid(
         snt.Linear(self._num_reads, name='free_gate')(inputs))
 
-    print('free gate:')
-    print(free_gate)
-
     # g_t^{a, i} - Interpolation between writing to unallocated memory and
     # content-based lookup, for each write head `i`. Note: `a` is simply used to
     # identify this gate with allocation vs writing (as defined below).
@@ -254,11 +249,6 @@ class MemoryAccess(snt.RNNCore):
     rom_mode = tf.map_fn(tf.nn.softmax, snt.Linear(2)(inputs))
     mu_controller = tf.sigmoid(
       snt.Linear(1, name='mu_controller')(inputs))
-
-    print('inputs: ')
-    print(inputs)
-    print('write_keys: ')
-    print(write_keys)
 
     # MIXER: rom read mode. Mix this with the previous mu
     rom_mode = self._mixer(rom_mode, prev_rom_mode, prev_mu, prev_rom_mode_usage)
@@ -441,16 +431,16 @@ class MemoryAccess(snt.RNNCore):
                     name=None, **unused_kwargs):
     # Now: copied the values from the state_size (state size will not be needed anymore, only used for the default )
     return AccessState(
-      memory=tf.zeros([self._memory_size, self._word_size], dtype),
-      read_weights=tf.zeros([self._num_reads, self._memory_size], dtype),
-      write_weights=tf.zeros([self._num_writes, self._memory_size], dtype),
-      mu=tf.zeros(1, dtype),
-      rom_weight=tf.zeros([self._rom.memory_size()], dtype),
-      rom_mode=tf.zeros([2], dtype),
+      memory=tf.zeros([batch_size, self._memory_size, self._word_size], dtype),
+      read_weights=tf.zeros([batch_size, self._num_reads, self._memory_size], dtype),
+      write_weights=tf.zeros([batch_size, self._num_writes, self._memory_size], dtype),
+      mu=tf.zeros([batch_size, 1], dtype),
+      rom_weight=tf.zeros([batch_size, self._rom.memory_size()], dtype),
+      rom_mode=tf.zeros([batch_size, 2], dtype),
       linkage=self._linkage.initial_state(batch_size, dtype),
       usage=self._freeness.initial_state(batch_size, dtype),
-      prev_rom_read_mode=tf.Variable([1, 0], dtype=dtype),
-      prev_rom_read_mode_usage=tf.Variable(1, dtype=dtype), # Can experiment with these last two values
+      prev_rom_read_mode=tf.tile(tf.constant([[1, 0]], dtype=dtype), [batch_size, 1]),
+      prev_rom_read_mode_usage=tf.tile(tf.constant([[1]], dtype=dtype), [batch_size, 1]), # Can experiment with these last two values
     )
 
   @property
@@ -466,7 +456,7 @@ class MemoryAccess(snt.RNNCore):
         linkage=self._linkage.state_size,
         usage=self._freeness.state_size,
         prev_rom_read_mode=tf.TensorShape([2]),
-        prev_rom_read_mode_usage=tf.TensorShape(1))
+        prev_rom_read_mode_usage=tf.TensorShape([1]))
 
   @property
   def output_size(self):

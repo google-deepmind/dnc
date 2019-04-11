@@ -104,7 +104,7 @@ def train(num_training_iterations, report_interval):
   #                                  FLAGS.min_repeats, FLAGS.max_repeats)
 
   # Eager execution, for printing
-  tf.enable_eager_execution()
+  # tf.enable_eager_execution()
 
   dataset = repeat_sequence.RepeatSequence(5, 5, 7, FLAGS.batch_size)
 

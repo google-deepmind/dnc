@@ -69,16 +69,13 @@ class Mixer(snt.AbstractModule):
   def _build(self, value_controller, value_rom, mu, used):
     batch_size = tf.shape(mu)[0]
     word_size = tf.shape(value_controller)[1]
-    print('Word size: ')
-    print(word_size)
-    print('Mu: ')
-    print(mu)
+
     tiled_mu = tf.tile(mu, [1, word_size])
     tiled_used = tf.tile(used, [1, word_size])
 
     z = tiled_mu * tiled_used # Can experiment with different functions here
 
-    # value = mu * value_rom + (1 - mu) * value_controller
+    # value = z * value_rom + (1 - z) * value_controller
     value = tf.add(
       tf.multiply(z, value_rom),
       tf.multiply(tf.subtract(tf.ones([batch_size, word_size], dtype='float32'), z), value_controller)
