@@ -26,6 +26,11 @@ from dnc import dnc_feedforward
 from dnc import repeat_copy
 from tasks import repeat_sequence
 
+import numpy as np
+np.set_printoptions(threshold=np.inf)
+
+from tensorflow.python import debug as tf_debug
+
 FLAGS = tf.flags.FLAGS
 
 # Model parameters
@@ -116,15 +121,22 @@ def train(num_training_iterations, report_interval):
   output_read_weightings = output_concat[:, :, dataset.target_size:(dataset.target_size+FLAGS.memory_size)]
   output_write_weightings = output_concat[:, :, (dataset.target_size+FLAGS.memory_size):(dataset.target_size+2*FLAGS.memory_size)]
   output_mu = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size):(dataset.target_size+2*FLAGS.memory_size+1)]
-  output_rom_weight = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1):(dataset.target_size+2*FLAGS.memory_size+1+8)]
-  output_rom_mode = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1+8):(dataset.target_size+2*FLAGS.memory_size+1+8+2)]
-  output_read_mode = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1+8+2):]
+  output_rom_weight = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1):(dataset.target_size+2*FLAGS.memory_size+1+12)]
+  output_rom_mode = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1+12):(dataset.target_size+2*FLAGS.memory_size+1+12+2)]
+  output_read_mode = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1+12+2):(dataset.target_size+2*FLAGS.memory_size+1+12+2+3)]
+  output_rom_key = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1+12+2+3):]
 
   # Used for visualization.
-  # output = tf.round(
-  #     tf.expand_dims(dataset_tensors.mask, -1) * tf.sigmoid(output_logits))
-
   output = tf.round(tf.sigmoid(output_logits))
+
+  # Rescaling first adds a row of ones so that max is always 255 in the rescaling
+  output_read_weightings = get_concat_with_ones(output_read_weightings)
+  output_write_weightings = get_concat_with_ones(output_write_weightings)
+  output_mu = get_concat_with_ones(output_mu)
+  output_rom_weight = get_concat_with_ones(output_rom_weight)
+  output_rom_mode = get_concat_with_ones(output_rom_mode)
+  output_read_mode = get_concat_with_ones(output_read_mode)
+  output_rom_key = get_concat_with_ones(output_rom_key)
 
   train_loss = dataset.cost(output_logits, dataset_tensors.target)
 
@@ -137,6 +149,7 @@ def train(num_training_iterations, report_interval):
   tf.summary.image('Rom_weight', tf.expand_dims(output_rom_weight, 3))
   tf.summary.image('rom_mode', tf.expand_dims(output_rom_mode, 3))
   tf.summary.image('read_mode', tf.expand_dims(output_read_mode, 3))
+  tf.summary.image('rom_key', tf.expand_dims(output_rom_key, 3))
   tf.summary.histogram('Loss', train_loss)
 
   merged = tf.summary.merge_all()
@@ -171,6 +184,8 @@ def train(num_training_iterations, report_interval):
   else:
     hooks = []
 
+  # hooks += [tf_debug.TensorBoardDebugHook("127.0.0.1:6007")]
+
   # Train.
   with tf.train.SingularMonitoredSession(
       hooks=hooks, checkpoint_dir=FLAGS.checkpoint_dir) as sess:
@@ -181,11 +196,11 @@ def train(num_training_iterations, report_interval):
     total_loss = 0
 
     for train_iteration in range(start_iteration, num_training_iterations):
-      _, loss, summary = sess.run([train_step, train_loss, merged])
+      _, loss, summary, rom_weight_np = sess.run([train_step, train_loss, merged, output_rom_weight])
       total_loss += loss
 
       if (train_iteration + 1) % report_interval == 0:
-        dataset_tensors_np, output_np = sess.run([dataset_tensors, output])
+        dataset_tensors_np, output_np, output_rom_weight_np = sess.run([dataset_tensors, output, output_rom_weight])
         dataset_string = dataset.to_human_readable(dataset_tensors_np,
                                                    output_np)
 
@@ -193,6 +208,9 @@ def train(num_training_iterations, report_interval):
                         train_iteration, total_loss / report_interval,
                         dataset_string)
         total_loss = 0
+
+        print("rom weighting:")
+        print(output_rom_weight_np)
 
         train_writer.add_summary(summary, train_iteration)
 
@@ -204,6 +222,10 @@ def to_batch_major(tensor):
 def main(unused_argv):
   tf.logging.set_verbosity(3)  # Print INFO log messages.
   train(FLAGS.num_training_iterations, FLAGS.report_interval)
+
+def get_concat_with_ones(tensor):
+  shape = tf.shape(tensor)
+  return tf.concat([tf.ones([shape[0], 1, shape[2]]), tensor], 1)
 
 
 if __name__ == "__main__":

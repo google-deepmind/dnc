@@ -21,7 +21,7 @@ class ROM(snt.AbstractModule):
     self._key_size = key_size
 
     self._read_content_weight_mod = addressing.CosineWeights(
-        1, key_size, name='read_content_weights')
+        1, key_size)
 
   # Recurrent, because readings of the mode depend on the previous read weight
   # Input is batch major
@@ -32,7 +32,7 @@ class ROM(snt.AbstractModule):
     content = tf.tile(tf.expand_dims(self._content, 0), [batch_size, 1, 1])
     # Expand dims is because the cosineweights is defined for multiple heads at once but we only have 1
     content_weight = self._read_content_weight_mod(
-      content[:, :, 0:self._key_size], tf.expand_dims(read_key, 1), read_strength   # TODO check that this content indices are correct
+      content[:, :, 0:self._key_size], tf.expand_dims(read_key, 1), read_strength
     )[:, 0, :]
 
     forward_weight = self._forward_read_weight(prev_read_weight)
