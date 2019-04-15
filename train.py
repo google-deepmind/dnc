@@ -117,14 +117,16 @@ def train(num_training_iterations, report_interval):
 
   output_concat = run_model(dataset_tensors.observations, dataset.target_size, True, time_major=dataset.time_major())
 
+  rom_weighting_size = 11
+
   output_logits = output_concat[:, :, 0:dataset.target_size]
   output_read_weightings = output_concat[:, :, dataset.target_size:(dataset.target_size+FLAGS.memory_size)]
   output_write_weightings = output_concat[:, :, (dataset.target_size+FLAGS.memory_size):(dataset.target_size+2*FLAGS.memory_size)]
   output_mu = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size):(dataset.target_size+2*FLAGS.memory_size+1)]
-  output_rom_weight = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1):(dataset.target_size+2*FLAGS.memory_size+1+12)]
-  output_rom_mode = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1+12):(dataset.target_size+2*FLAGS.memory_size+1+12+2)]
-  output_read_mode = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1+12+2):(dataset.target_size+2*FLAGS.memory_size+1+12+2+3)]
-  output_rom_key = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1+12+2+3):]
+  output_rom_weight = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1):(dataset.target_size+2*FLAGS.memory_size+1+rom_weighting_size)]
+  output_rom_mode = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1+rom_weighting_size):(dataset.target_size+2*FLAGS.memory_size+1+rom_weighting_size+2)]
+  output_read_mode = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1+rom_weighting_size+2):(dataset.target_size+2*FLAGS.memory_size+1+rom_weighting_size+2+3)]
+  output_rom_key = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1+rom_weighting_size+2+3):]
 
   # Used for visualization.
   output = tf.round(tf.sigmoid(output_logits))
@@ -209,8 +211,8 @@ def train(num_training_iterations, report_interval):
                         dataset_string)
         total_loss = 0
 
-        print("rom weighting:")
-        print(output_rom_weight_np)
+        # print("rom weighting:")
+        # print(output_rom_weight_np)
 
         train_writer.add_summary(summary, train_iteration)
 

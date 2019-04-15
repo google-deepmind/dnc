@@ -64,8 +64,8 @@ class DNC(snt.RNNCore):
 
     self._memory_size = access_config.get('memory_size')
     # TODO make some of these values more dynamic
-    # Two vectors + mu + 12 for the rom weights + 2 for the rom mode + 3 for the read mode + 2 for rom_mode
-    self._nb_extra_output = 2 * self._memory_size + 1 + 12 + 2 + 3 + 2
+    # Two vectors + mu + 11 for the rom weights + 2 for the rom mode + 3 for the read mode + 2 for rom_mode
+    self._nb_extra_output = 2 * self._memory_size + 1 + 11 + 2 + 3 + 2
 
     with self._enter_variable_scope():
       self._controller = snt.LSTM(**controller_config)

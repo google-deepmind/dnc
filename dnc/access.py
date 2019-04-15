@@ -124,14 +124,15 @@ class MemoryAccess(snt.RNNCore):
     # TODO try with a nothing in the middle of the program: then the output can be passed directly
 
     content = tf.constant([content.to_array() for content in [
-      rom_factory.create_content([0, 1], {}, 0), # A value to read from to mix nothing
+      # Put the mu of the first back to 0: this is set to one for forcing the controller to use the program
+      rom_factory.create_content([0, 1], {'next_rom_mode': [0, 1]}, 1), # A value to read from to mix nothing
       rom_factory.create_content([1, 0], {'write_gate': [1], 'write_weight': weighting, 'next_rom_mode': [0, 1]}, 1),
       rom_factory.create_content([0, 0], {'allocation_gate': [1], 'write_gate': [1], 'next_rom_mode': [0, 1]}, 1),
       rom_factory.create_content([0, 0], {'allocation_gate': [1], 'write_gate': [1], 'next_rom_mode': [0, 1]}, 1),
       rom_factory.create_content([0, 0], {'allocation_gate': [1], 'write_gate': [1], 'next_rom_mode': [0, 1]}, 1),
       rom_factory.create_content([0, 0], {'allocation_gate': [1], 'write_gate': [1], 'next_rom_mode': [0, 1]}, 1),
-      rom_factory.create_content([0, 0], {}, 1),
-      rom_factory.create_content([0, 0], {'read_weight': weighting, 'write_gate': [0], 'read_mode': [0, 1, 0], 'next_rom_mode': [0, 1]}, 1),
+      # rom_factory.create_content([0, 0], {}, 1),
+      rom_factory.create_content([0, 0], {'read_weight': weighting, 'write_gate': [0], 'read_mode': [0, 1, 0], 'next_rom_mode': [0, 1]}, 1),  # read mode can be deleted
       rom_factory.create_content([0, 0], {'write_gate': [0], 'read_mode': [0, 0, 1], 'next_rom_mode': [0, 1]}, 1),
       rom_factory.create_content([0, 0], {'write_gate': [0], 'read_mode': [0, 0, 1], 'next_rom_mode': [0, 1]}, 1),
       rom_factory.create_content([0, 0], {'write_gate': [0], 'read_mode': [0, 0, 1], 'next_rom_mode': [0, 1]}, 1),
@@ -261,6 +262,7 @@ class MemoryAccess(snt.RNNCore):
 
     # Read rom contents
     rom_word, rom_weight = self._rom(rom_key, rom_strength, rom_mode, prev_rom_weight)
+
     # rom_word is batch_size x l
     rom_word_dict = self._rom_reader.read_rom_batch_tensor(rom_word)
     mu_rom = rom_word_dict['mu']
@@ -283,6 +285,13 @@ class MemoryAccess(snt.RNNCore):
     # Update mu
     batch_size = tf.shape(mu_rom)[0]
     new_mu_usage = tf.ones([batch_size, 1])  # Usage is always one for mu
+    # print('Mixing mu: ')
+    # print('previous: ')
+    # print(prev_mu)
+    # print('controller: ')
+    # print(mu_controller)
+    # print('rom: ')
+    # print(mu_rom)
     new_mu = self._mixer(mu_controller, mu_rom, prev_mu, new_mu_usage)
 
     # TODO lots of duplication here, extract into a method on the rom
@@ -436,16 +445,17 @@ class MemoryAccess(snt.RNNCore):
                     trainable_initializers=None, trainable_regularizers=None,
                     name=None, **unused_kwargs):
     # Now: copied the values from the state_size (state size will not be needed anymore, only used for the default )
+    initial_rom_weight = tf.one_hot(tf.zeros(batch_size, dtype='int32'), self._rom.memory_size(), dtype=dtype)
     return AccessState(
       memory=tf.zeros([batch_size, self._memory_size, self._word_size], dtype),
       read_weights=tf.zeros([batch_size, self._num_reads, self._memory_size], dtype),
       write_weights=tf.zeros([batch_size, self._num_writes, self._memory_size], dtype),
-      mu=tf.zeros([batch_size, 1], dtype),
-      rom_weight=tf.zeros([batch_size, self._rom.memory_size()], dtype),
+      mu=tf.ones([batch_size, 1], dtype), # TODO put mu back to zero
+      rom_weight=initial_rom_weight,
       rom_mode=tf.zeros([batch_size, 2], dtype),
       linkage=self._linkage.initial_state(batch_size, dtype),
       usage=self._freeness.initial_state(batch_size, dtype),
-      prev_rom_read_mode=tf.tile(tf.constant([[1, 0]], dtype=dtype), [batch_size, 1]),
+      prev_rom_read_mode=tf.tile(tf.constant([[0, 1]], dtype=dtype), [batch_size, 1]),  # TODO make this key-based ([1,0])
       prev_rom_read_mode_usage=tf.tile(tf.constant([[1]], dtype=dtype), [batch_size, 1]), # Can experiment with these last two values
       rom_key=tf.zeros([batch_size, 2])
     )

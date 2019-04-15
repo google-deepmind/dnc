@@ -29,7 +29,4 @@ IDEE
  - de read_mode van de rom altijd op next zetten wanneer mu 1 is
 
 TODO
- - Onderzoeken waarom rom_weighting bijna nul is overal
- - mu op 1 zetten in begin en identity function laten leren
- - proberen met en zonder middelste stap
-
+ - Onderzoeken waarom read_mode op next staat maar toch niet de next wordt gelezen -> probleem met linkage?
