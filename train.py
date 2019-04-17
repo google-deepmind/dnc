@@ -117,7 +117,7 @@ def train(num_training_iterations, report_interval):
 
   output_concat = run_model(dataset_tensors.observations, dataset.target_size, True, time_major=dataset.time_major())
 
-  rom_weighting_size = 11
+  rom_weighting_size = 12
 
   output_logits = output_concat[:, :, 0:dataset.target_size]
   output_read_weightings = output_concat[:, :, dataset.target_size:(dataset.target_size+FLAGS.memory_size)]
@@ -126,7 +126,9 @@ def train(num_training_iterations, report_interval):
   output_rom_weight = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1):(dataset.target_size+2*FLAGS.memory_size+1+rom_weighting_size)]
   output_rom_mode = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1+rom_weighting_size):(dataset.target_size+2*FLAGS.memory_size+1+rom_weighting_size+2)]
   output_read_mode = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1+rom_weighting_size+2):(dataset.target_size+2*FLAGS.memory_size+1+rom_weighting_size+2+3)]
-  output_rom_key = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1+rom_weighting_size+2+3):]
+  output_rom_key = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1+rom_weighting_size+2+3):(dataset.target_size+2*FLAGS.memory_size+1+rom_weighting_size+2+3+2)]
+  output_original_read_weights = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1+rom_weighting_size+2+3+2):(dataset.target_size+2*FLAGS.memory_size+1+rom_weighting_size+2+3+2+FLAGS.memory_size)]
+  output_forward_weights = output_concat[:, :, (dataset.target_size+2*FLAGS.memory_size+1+rom_weighting_size+2+3+2+FLAGS.memory_size):]
 
   # Used for visualization.
   output = tf.round(tf.sigmoid(output_logits))
@@ -139,6 +141,8 @@ def train(num_training_iterations, report_interval):
   output_rom_mode = get_concat_with_ones(output_rom_mode)
   output_read_mode = get_concat_with_ones(output_read_mode)
   output_rom_key = get_concat_with_ones(output_rom_key)
+  output_original_read_weights = get_concat_with_ones((output_original_read_weights))
+  output_forward_weights = get_concat_with_ones(output_forward_weights)
 
   train_loss = dataset.cost(output_logits, dataset_tensors.target)
 
@@ -152,6 +156,8 @@ def train(num_training_iterations, report_interval):
   tf.summary.image('rom_mode', tf.expand_dims(output_rom_mode, 3))
   tf.summary.image('read_mode', tf.expand_dims(output_read_mode, 3))
   tf.summary.image('rom_key', tf.expand_dims(output_rom_key, 3))
+  tf.summary.image('Non mixed read weights', tf.expand_dims(output_original_read_weights, 3))
+  tf.summary.image('Forward read weights', tf.expand_dims(output_forward_weights, 3))
   tf.summary.histogram('Loss', train_loss)
 
   merged = tf.summary.merge_all()

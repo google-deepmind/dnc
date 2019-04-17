@@ -64,8 +64,9 @@ class DNC(snt.RNNCore):
 
     self._memory_size = access_config.get('memory_size')
     # TODO make some of these values more dynamic
-    # Two vectors + mu + 11 for the rom weights + 2 for the rom mode + 3 for the read mode + 2 for rom_mode
-    self._nb_extra_output = 2 * self._memory_size + 1 + 11 + 2 + 3 + 2
+    # Two vectors + mu + 12 for the rom weights + 2 for the rom mode + 3 for the read mode + 2 for rom_mode + one time the original read weights
+    # + one time the forward weights
+    self._nb_extra_output = 2 * self._memory_size + 1 + 12 + 2 + 3 + 2 + 2*self._memory_size
 
     with self._enter_variable_scope():
       self._controller = snt.LSTM(**controller_config)
@@ -124,7 +125,7 @@ class DNC(snt.RNNCore):
     controller_output = self._clip_if_enabled(controller_output)
     controller_state = tf.contrib.framework.nest.map_structure(self._clip_if_enabled, controller_state)
 
-    access_output, access_state, read_mode = self._access(controller_output,
+    access_output, access_state, read_mode, original_read_weights, forward_weights = self._access(controller_output,
                                                prev_access_state)
 
     output = tf.concat([controller_output, batch_flatten(access_output)], 1)
@@ -148,7 +149,9 @@ class DNC(snt.RNNCore):
                           access_state.rom_weight,
                           access_state.rom_mode,
                           read_mode,
-                          access_state.rom_key], 1)
+                          access_state.rom_key,
+                          original_read_weights,
+                          forward_weights], 1)
 
     return output, DNCState(
         access_output=access_output,

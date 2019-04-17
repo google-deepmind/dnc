@@ -30,3 +30,5 @@ IDEE
 
 TODO
  - Onderzoeken waarom read_mode op next staat maar toch niet de next wordt gelezen -> probleem met linkage?
+ - Eigenlijk moet mu op de rom de next mu zijn: nu wordt het gebruikt als current mu. Dus als het 0 is dan
+   wordt er in die stap niks meer gemixt terwijl dat wel zo moet zijn

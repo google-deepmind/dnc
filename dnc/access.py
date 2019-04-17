@@ -131,12 +131,12 @@ class MemoryAccess(snt.RNNCore):
       rom_factory.create_content([0, 0], {'allocation_gate': [1], 'write_gate': [1], 'next_rom_mode': [0, 1]}, 1),
       rom_factory.create_content([0, 0], {'allocation_gate': [1], 'write_gate': [1], 'next_rom_mode': [0, 1]}, 1),
       rom_factory.create_content([0, 0], {'allocation_gate': [1], 'write_gate': [1], 'next_rom_mode': [0, 1]}, 1),
-      # rom_factory.create_content([0, 0], {}, 1),
-      rom_factory.create_content([0, 0], {'read_weight': weighting, 'write_gate': [0], 'read_mode': [0, 1, 0], 'next_rom_mode': [0, 1]}, 1),  # read mode can be deleted
-      rom_factory.create_content([0, 0], {'write_gate': [0], 'read_mode': [0, 0, 1], 'next_rom_mode': [0, 1]}, 1),
-      rom_factory.create_content([0, 0], {'write_gate': [0], 'read_mode': [0, 0, 1], 'next_rom_mode': [0, 1]}, 1),
-      rom_factory.create_content([0, 0], {'write_gate': [0], 'read_mode': [0, 0, 1], 'next_rom_mode': [0, 1]}, 1),
-      rom_factory.create_content([0, 0], {'write_gate': [0], 'read_mode': [0, 0, 1]}, 0),
+      rom_factory.create_content([0, 0], {}, 1),
+      rom_factory.create_content([0, 0], {'read_weight': weighting, 'write_gate': [0], 'next_rom_mode': [0, 1]}, 1),
+      rom_factory.create_content([0, 0], {'write_gate': [0], 'read_mode': [0, 1, 0], 'next_rom_mode': [0, 1]}, 1),
+      rom_factory.create_content([0, 0], {'write_gate': [0], 'read_mode': [0, 1, 0], 'next_rom_mode': [0, 1]}, 1),
+      rom_factory.create_content([0, 0], {'write_gate': [0], 'read_mode': [0, 1, 0], 'next_rom_mode': [0, 1]}, 1),
+      rom_factory.create_content([0, 0], {'write_gate': [0], 'read_mode': [0, 1, 0]}, 0),
     ]], dtype='float32')
 
     self._rom = rom.ROM(content, key_size)
@@ -180,7 +180,7 @@ class MemoryAccess(snt.RNNCore):
     linkage_state = self._linkage(write_weights, prev_state.linkage)
 
     # Read from memory.
-    read_weights = self._read_weights(
+    read_weights, original_read_weights, forward_weights = self._read_weights(
         inputs,
         memory=memory,
         prev_read_weights=prev_state.read_weights,
@@ -194,12 +194,14 @@ class MemoryAccess(snt.RNNCore):
         mu=inputs['mu'],
         rom_weight=rom_weight,
         rom_mode=inputs['rom_mode'], # rom mode is needed for debugging purposes (we output it from the network)
-        rom_key=rom_key, # Needed for debugging
+        rom_key=rom_key, # Needed for debugging (could move out of the state and just output it
         linkage=linkage_state,
         usage=usage,
         prev_rom_read_mode=inputs['prev_rom_read_mode'],
         prev_rom_read_mode_usage=inputs['prev_rom_read_mode_usage']),
-            inputs['read_mode'][:, 0, :])  # I added the read mode here temporarily for displaying it in tensorboard
+            inputs['read_mode'][:, 0, :],  # I added the read mode here temporarily for displaying it in tensorboard
+            original_read_weights[:, 0, :], # For debugging
+            forward_weights[:, 0, 0, :]) # For debugging
 
   # TODO make sure prev_mu is initialized to 0
   def _read_inputs(self, inputs, prev_rom_weight, prev_mu, prev_rom_mode, prev_rom_mode_usage):
@@ -437,9 +439,7 @@ class MemoryAccess(snt.RNNCore):
       rom_read_weight = inputs['rom_read_weight'][:, 1:]
       mixed_read_weight = self._mixer(first_head_read_weight, rom_read_weight, inputs['mu'], rom_read_weight_usage)
 
-      read_weights = tf.expand_dims(mixed_read_weight, 1)
-
-      return read_weights
+      return tf.expand_dims(mixed_read_weight, 1), read_weights, forward_weights # Return the original, non mixed weights as well for debugging
 
   def initial_state(self, batch_size, dtype=tf.float32, trainable=False,
                     trainable_initializers=None, trainable_regularizers=None,
