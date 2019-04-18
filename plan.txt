@@ -1,34 +1,19 @@
-Plan voor een volledig programma op de rom te zetten:
-Om het eerst geschreven adress te recoveren, 2 modes nodig:
- - hardcoded mode: hardcoded adressen om te lezen en te schrijven
-   dan kunnen we de eerste en laatste adressen op hardcoded adressen lezen en schrijven
-   en daarna gewoon vooruit gaan in de temporal link
- - parameter mode: parameters om adressen te berekenen aanpassen
-
-Nieuw plan: geen 2 aparte modes, elk veld heeft een bit die zegt of die moet gemixed worden of niet.
-
-De mode is de voorlaatste bit in een rom content: 0 is hardcoded, 1 is parameter mode.
-
-TODO
-  Huidige status: helpers geimplementeerd, nu nog de rom read key fixen (pak keysize 1 om te beginnen, maak het dynamisch)
-  Daarna is checken of het kan getraind worden
-
-TODO
- - Alle parameters op de rom content zetten. Hiervoor een helper klasse schrijven die het kan inlezen/uitlezen.
-   Dit zal alles wat vergemakkelijken in plaats van hardcoden de hele tijd.
-    - Helper klasse schrijven
-    - Access en ROM aanpassen:
-        - ROM aanpassen naar 2 methodes: 1 om mu te mixen, 1 om values te mixen
-        - Access: eerst mu mixen in het begin, dan die nieuwe value gebruiken om de andere parameters te mixen
-    - Van de rom een soort hashmap maken, in plaats van keys die op de content zitten
-      Als alle niet-interessante plaatsen dan dezelfde key hebben (bvb zeros), dan worden die sowieso niet geaddresseerd
-      want dan krijg je nooit een one-hot weighting
- - Volledig programma van lezen en schrijven testen
 
 IDEE
  - de read_mode van de rom altijd op next zetten wanneer mu 1 is
 
 TODO
- - Onderzoeken waarom read_mode op next staat maar toch niet de next wordt gelezen -> probleem met linkage?
+ - Heel belangrijk: over de usage: als usage nul is mag ook niet de vector [0, 0, ...] gelezen worden
+   -> want anders beinvloed deze de eigenlijke waarde wat niet juist zou zijn
+   Hier een test voor schrijven!!
+   -> Oplossing: weighted sum met usage. Hoe oplossen als deling nul zou zijn (dus niks gemixt)?
+            -> oplossen: div_no_nan
  - Eigenlijk moet mu op de rom de next mu zijn: nu wordt het gebruikt als current mu. Dus als het 0 is dan
    wordt er in die stap niks meer gemixt terwijl dat wel zo moet zijn
+ - In de tensorboard images ook mu van controller en mu van rom apart zetten
+
+VRAGEN
+ - Goede voorbeelden bedenken?
+        - repeat copy: enkel read en write deel
+ - Computationele kracht nodig?
+ - Feedforward net gebruiken?

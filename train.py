@@ -44,7 +44,7 @@ tf.flags.DEFINE_integer("clip_value", 20,
 
 # Optimizer parameters.
 tf.flags.DEFINE_float("max_grad_norm", 50, "Gradient clipping norm limit.")
-tf.flags.DEFINE_float("learning_rate", 1e-4, "Optimizer learning rate.")
+tf.flags.DEFINE_float("learning_rate", 1e-2, "Optimizer learning rate.")
 tf.flags.DEFINE_float("optimizer_epsilon", 1e-10,
                       "Epsilon used for RMSProp optimizer.")
 
@@ -117,7 +117,7 @@ def train(num_training_iterations, report_interval):
 
   output_concat = run_model(dataset_tensors.observations, dataset.target_size, True, time_major=dataset.time_major())
 
-  rom_weighting_size = 12
+  rom_weighting_size = 11
 
   output_logits = output_concat[:, :, 0:dataset.target_size]
   output_read_weightings = output_concat[:, :, dataset.target_size:(dataset.target_size+FLAGS.memory_size)]
