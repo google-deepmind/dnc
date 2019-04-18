@@ -10,6 +10,7 @@ TODO
             -> oplossen: div_no_nan
  - Eigenlijk moet mu op de rom de next mu zijn: nu wordt het gebruikt als current mu. Dus als het 0 is dan
    wordt er in die stap niks meer gemixt terwijl dat wel zo moet zijn
+    -> Hier nog eens over nadenken
  - In de tensorboard images ook mu van controller en mu van rom apart zetten
 
 VRAGEN

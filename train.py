@@ -117,7 +117,7 @@ def train(num_training_iterations, report_interval):
 
   output_concat = run_model(dataset_tensors.observations, dataset.target_size, True, time_major=dataset.time_major())
 
-  rom_weighting_size = 11
+  rom_weighting_size = 12
 
   output_logits = output_concat[:, :, 0:dataset.target_size]
   output_read_weightings = output_concat[:, :, dataset.target_size:(dataset.target_size+FLAGS.memory_size)]

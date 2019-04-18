@@ -26,7 +26,6 @@ import numpy as np
 from dnc import addressing
 from dnc import util
 from dnc import rom
-from dnc import rom_content
 
 # I added rom_mode here because that is easier for testing
 AccessState = collections.namedtuple('AccessState', (
@@ -114,34 +113,27 @@ class MemoryAccess(snt.RNNCore):
     self._linkage = addressing.TemporalLinkage(memory_size, num_writes)
     self._freeness = addressing.Freeness(memory_size)
 
-    # Key size of 1
-    key_size = 2
-    rom_factory = rom_content.ROMContentFactory(key_size, memory_size, word_size)
-
+    # Create ROM content
     weighting = [0] * memory_size
     weighting[0] = 1
 
-    # TODO try with a nothing in the middle of the program: then the output can be passed directly
-
-    content = tf.constant([content.to_array() for content in [
-      # Put the mu of the first back to 0: this is set to one for forcing the controller to use the program
-      rom_factory.create_content([0, 1], {'next_rom_mode': [0, 1]}, 1), # A value to read from to mix nothing
-      rom_factory.create_content([1, 0], {'write_gate': [1], 'write_weight': weighting, 'next_rom_mode': [0, 1]}, 1),
-      rom_factory.create_content([0, 0], {'allocation_gate': [1], 'write_gate': [1], 'next_rom_mode': [0, 1]}, 1),
-      rom_factory.create_content([0, 0], {'allocation_gate': [1], 'write_gate': [1], 'next_rom_mode': [0, 1]}, 1),
-      rom_factory.create_content([0, 0], {'allocation_gate': [1], 'write_gate': [1], 'next_rom_mode': [0, 1]}, 1),
-      rom_factory.create_content([0, 0], {'allocation_gate': [1], 'write_gate': [1], 'next_rom_mode': [0, 1]}, 1),
-      rom_factory.create_content([0, 0], {'next_rom_mode': [0, 1]}, 1),
-      rom_factory.create_content([0, 0], {'read_weight': weighting, 'write_gate': [0], 'next_rom_mode': [0, 1]}, 1),
-      rom_factory.create_content([0, 0], {'write_gate': [0], 'read_mode': [0, 1, 0], 'next_rom_mode': [0, 1]}, 1),
-      rom_factory.create_content([0, 0], {'write_gate': [0], 'read_mode': [0, 1, 0], 'next_rom_mode': [0, 1]}, 1),
-      rom_factory.create_content([0, 0], {'write_gate': [0], 'read_mode': [0, 1, 0], 'next_rom_mode': [0, 1]}, 1),
-      rom_factory.create_content([0, 0], {'write_gate': [0], 'read_mode': [0, 1, 0]}, 0),
-    ]], dtype='float32')
-
-    self._rom = rom.ROM(content, key_size)
+    content = [
+      ([0, 1], {'next_rom_mode': [0, 1]}, 1), # A value to read from to mix nothing
+      ([1, 0], {'write_gate': [1], 'write_weight': weighting, 'next_rom_mode': [0, 1]}, 1),
+      ([0, 0], {'allocation_gate': [1], 'write_gate': [1], 'next_rom_mode': [0, 1]}, 1),
+      ([0, 0], {'allocation_gate': [1], 'write_gate': [1], 'next_rom_mode': [0, 1]}, 1),
+      ([0, 0], {'allocation_gate': [1], 'write_gate': [1], 'next_rom_mode': [0, 1]}, 1),
+      ([0, 0], {'allocation_gate': [1], 'write_gate': [1], 'next_rom_mode': [0, 1]}, 1),
+      ([0, 0], {'next_rom_mode': [0, 1]}, 1),
+      ([0, 0], {'read_weight': weighting, 'write_gate': [0], 'next_rom_mode': [0, 1]}, 1),
+      ([0, 0], {'write_gate': [0], 'read_mode': [0, 1, 0], 'next_rom_mode': [0, 1]}, 1),
+      ([0, 0], {'write_gate': [0], 'read_mode': [0, 1, 0], 'next_rom_mode': [0, 1]}, 1),
+      ([0, 0], {'write_gate': [0], 'read_mode': [0, 1, 0], 'next_rom_mode': [0, 1]}, 1),
+      ([0, 0], {'write_gate': [0], 'read_mode': [0, 1, 0]}, 0),
+    ]
+    self._rom = rom.ROM(content, memory_size)
     self._mixer = rom.Mixer()
-    self._rom_reader = rom_factory
+
 
   def _build(self, inputs, prev_state):
     """Connects the MemoryAccess module into the graph.
@@ -264,10 +256,7 @@ class MemoryAccess(snt.RNNCore):
 
     # Read rom contents
     rom_word, rom_weight = self._rom(rom_key, rom_strength, rom_mode, prev_rom_weight)
-
-    # rom_word is batch_size x l
-    rom_word_dict = self._rom_reader.read_rom_batch_tensor(rom_word)
-    mu_rom = rom_word_dict['mu']
+    mu_rom = rom_word['mu']
 
     # tf.print('rom_weight')
     # tf.print(rom_weight)
@@ -300,21 +289,21 @@ class MemoryAccess(snt.RNNCore):
 
     # MIXER: read mode
     first_head_read_mode = read_mode[:, 0, :]
-    rom_read_mode_usage = rom_word_dict['read_mode'][:, 0:1]
-    rom_read_mode = rom_word_dict['read_mode'][:, 1:]
+    rom_read_mode_usage = rom_word['read_mode'][:, 0:1]
+    rom_read_mode = rom_word['read_mode'][:, 1:]
     mixed_read_mode = self._mixer(first_head_read_mode, rom_read_mode, new_mu, rom_read_mode_usage)
     read_mode = tf.expand_dims(mixed_read_mode, 1)
 
     # MIXER: allocation gate
     first_head_allocation_gate = allocation_gate
-    rom_allocation_gate_usage = rom_word_dict['allocation_gate'][:, 0:1]
-    rom_allocation_gate = rom_word_dict['allocation_gate'][:, 1:]
+    rom_allocation_gate_usage = rom_word['allocation_gate'][:, 0:1]
+    rom_allocation_gate = rom_word['allocation_gate'][:, 1:]
     allocation_gate = self._mixer(first_head_allocation_gate, rom_allocation_gate, new_mu, rom_allocation_gate_usage)
 
     # MIXER: write gate
     first_head_write_gate = write_gate
-    rom_write_gate_usage = rom_word_dict['write_gate'][:, 0:1]
-    rom_write_gate = rom_word_dict['write_gate'][:, 1:]
+    rom_write_gate_usage = rom_word['write_gate'][:, 0:1]
+    rom_write_gate = rom_word['write_gate'][:, 1:]
     write_gate = self._mixer(first_head_write_gate, rom_write_gate, new_mu, rom_write_gate_usage)
 
     result = {
@@ -331,12 +320,12 @@ class MemoryAccess(snt.RNNCore):
         # 'rom_key': rom_key,
         # 'rom_strength': rom_strength, # Maybe later add these, could be useful for debugging
         'rom_mode': rom_mode,
-        'next_rom_mode': rom_word_dict['next_rom_mode'],  # Content on the rom can also influence the next rom mode
+        'next_rom_mode': rom_word['next_rom_mode'],  # Content on the rom can also influence the next rom mode
         'mu': new_mu,
-        'rom_read_weight': rom_word_dict['read_weight'],
-        'rom_write_weight': rom_word_dict['write_weight'],
-        'prev_rom_read_mode': rom_word_dict['next_rom_mode'][:, 1:],
-        'prev_rom_read_mode_usage': rom_word_dict['next_rom_mode'][:, 0:1],
+        'rom_read_weight': rom_word['read_weight'],
+        'rom_write_weight': rom_word['write_weight'],
+        'prev_rom_read_mode': rom_word['next_rom_mode'][:, 1:],
+        'prev_rom_read_mode_usage': rom_word['next_rom_mode'][:, 0:1],
     }
     return result, rom_weight, rom_key
 
