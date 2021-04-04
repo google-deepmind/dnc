@@ -70,3 +70,14 @@ def reduce_prod(x, axis, name=None):
     idx2 = tf.zeros([size], tf.float32)
     indices = tf.stack([idx1, idx2], 1)
     return tf.gather_nd(cp, tf.cast(indices, tf.int32))
+
+# tf2 and sonnet2 compatibility
+def state_size_from_initial_state(initial_state):
+    if isinstance(initial_state, tf.Tensor):
+        return initial_state.shape
+
+    state_size_dict = {}
+    #import ipdb; ipdb.set_trace()
+    for field, value in initial_state._asdict().items():
+        state_size_dict[field] = state_size_from_initial_state(value)
+    return type(initial_state)(**state_size_dict)

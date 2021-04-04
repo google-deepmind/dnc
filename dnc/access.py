@@ -102,6 +102,10 @@ class MemoryAccess(snt.RNNCore):
     self._num_reads = num_reads
     self._num_writes = num_writes
 
+    self._memory_dtype = tf.float32
+    self._read_dtype = tf.float32
+    self._write_dtype = tf.float32
+
     self._write_content_weights_mod = addressing.CosineWeights(
         num_writes, word_size, name='write_content_weights')
     self._read_content_weights_mod = addressing.CosineWeights(
@@ -109,6 +113,9 @@ class MemoryAccess(snt.RNNCore):
 
     self._linkage = addressing.TemporalLinkage(memory_size, num_writes)
     self._freeness = addressing.Freeness(memory_size)
+
+  def __call__(inputs, prev_state):
+      return self._build(inputs, prev_state)
 
   def _build(self, inputs, prev_state):
     """Connects the MemoryAccess module into the graph.
@@ -302,15 +309,19 @@ class MemoryAccess(snt.RNNCore):
 
       return read_weights
 
-  @property
-  def state_size(self):
+  # memory access states sizes indpendent of batch size
+  def initial_state(self, batch_size=None):
     """Returns a tuple of the shape of the state tensors."""
     return AccessState(
-        memory=tf.TensorShape([self._memory_size, self._word_size]),
-        read_weights=tf.TensorShape([self._num_reads, self._memory_size]),
-        write_weights=tf.TensorShape([self._num_writes, self._memory_size]),
-        linkage=self._linkage.state_size,
-        usage=self._freeness.state_size)
+        memory=tf.zeros([self._memory_size, self._word_size], dtype=self._memory_dtype),
+        read_weights=tf.zeros([self._num_reads, self._memory_size], dtype=self._read_dtype),
+        write_weights=tf.zeros([self._num_writes, self._memory_size], dtype=self._write_dtype),
+        linkage=self._linkage.initial_state(batch_size),
+        usage=self._freeness.initial_state(batch_size))
+
+  @property
+  def state_size(self):
+    return util.state_size_from_initial_state(self.initial_state())
 
   @property
   def output_size(self):

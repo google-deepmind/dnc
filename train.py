@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import sonnet as snt
 
 from dnc import dnc
@@ -80,8 +80,9 @@ def run_model(input_sequence, output_size):
   }
   clip_value = FLAGS.clip_value
 
-  dnc_core = dnc.DNC(access_config, controller_config, output_size, clip_value)
-  initial_state = dnc_core.initial_state(FLAGS.batch_size)
+  dnc_core = dnc.DNC(
+    access_config, controller_config, output_size, FLAGS.batch_size, clip_value)
+  initial_state = dnc_core.get_initial_state()
   output_sequence, _ = tf.nn.dynamic_rnn(
       cell=dnc_core,
       inputs=input_sequence,

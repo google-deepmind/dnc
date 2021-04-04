@@ -55,7 +55,7 @@ def weighted_softmax(activations, strengths, strengths_op):
   return softmax(sharp_activations)
 
 
-class CosineWeights(snt.AbstractModule):
+class CosineWeights(snt.Module):
   """Cosine-weighted attention.
 
   Calculates the cosine similarity between a query and each word in memory, then
@@ -129,6 +129,11 @@ class TemporalLinkage(snt.RNNCore):
     super(TemporalLinkage, self).__init__(name=name)
     self._memory_size = memory_size
     self._num_writes = num_writes
+    self._link_dtype = tf.float32
+    self._precedence_dtype = tf.float32
+
+  def __call__(inputs, prev_state):
+      return self._build(inputs, prev_state)
 
   def _build(self, write_weights, prev_state):
     """Calculate the updated linkage state given the write weights.
@@ -239,14 +244,21 @@ class TemporalLinkage(snt.RNNCore):
       write_sum = tf.reduce_sum(write_weights, 2, keepdims=True)
       return (1 - write_sum) * prev_precedence_weights + write_weights
 
-  @property
-  def state_size(self):
+  # addressing state size is independent of batch size
+  def initial_state(self, batch_size=None):
     """Returns a `TemporalLinkageState` tuple of the state tensors' shapes."""
     return TemporalLinkageState(
-        link=tf.TensorShape(
-            [self._num_writes, self._memory_size, self._memory_size]),
-        precedence_weights=tf.TensorShape([self._num_writes,
-                                           self._memory_size]),)
+        link=tf.zeros(
+            [self._num_writes, self._memory_size, self._memory_size],
+            dtype=self._link_dtype),
+        precedence_weights=tf.zeros(
+            [self._num_writes, self._memory_size],
+            dtype=self._precedence_dtype)
+    )
+
+  @property
+  def state_size(self):
+      return util.state_size_from_initial_state(self.initial_state())
 
 
 class Freeness(snt.RNNCore):
@@ -275,6 +287,10 @@ class Freeness(snt.RNNCore):
     """
     super(Freeness, self).__init__(name=name)
     self._memory_size = memory_size
+    self._dtype = tf.float32
+
+  def __call__(inputs, prev_state):
+      return self._build(inputs, prev_state)
 
   def _build(self, write_weights, free_gate, read_weights, prev_usage):
     """Calculates the new memory usage u_t.
@@ -404,7 +420,11 @@ class Freeness(snt.RNNCore):
       # corresponds to the original indexing of `usage`.
       return util.batch_gather(sorted_allocation, inverse_indices)
 
+  # freeness size is independent of batch size
+  def initial_state(self, batch_size=None):
+    """Returns the shape of the state tensor."""
+    return tf.zeros([self._memory_size], dtype=self._dtype)
+
   @property
   def state_size(self):
-    """Returns the shape of the state tensor."""
-    return tf.TensorShape([self._memory_size])
+    return util.state_size_from_initial_state(self.initial_state())

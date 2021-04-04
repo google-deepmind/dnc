@@ -25,9 +25,9 @@ from __future__ import print_function
 import collections
 import numpy as np
 import sonnet as snt
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
-from dnc import access
+from dnc import access, util
 
 DNCState = collections.namedtuple('DNCState', ('access_output', 'access_state',
                                                'controller_state'))
@@ -43,6 +43,7 @@ class DNC(snt.RNNCore):
                access_config,
                controller_config,
                output_size,
+               batch_size,
                clip_value=None,
                name='dnc'):
     """Initializes the DNC core.
@@ -61,25 +62,30 @@ class DNC(snt.RNNCore):
     """
     super(DNC, self).__init__(name=name)
 
-    with self._enter_variable_scope():
-      self._controller = snt.LSTM(**controller_config)
-      self._access = access.MemoryAccess(**access_config)
+    #with self._enter_variable_scope():
+    self._controller = snt.LSTM(**controller_config)
+    self._access = access.MemoryAccess(**access_config)
 
     self._access_output_size = np.prod(self._access.output_size.as_list())
     self._output_size = output_size
+    self._batch_size = batch_size
     self._clip_value = clip_value or 0
 
     self._output_size = tf.TensorShape([output_size])
     self._state_size = DNCState(
         access_output=self._access_output_size,
         access_state=self._access.state_size,
-        controller_state=self._controller.state_size)
+        controller_state=util.state_size_from_initial_state(
+            self._controller.initial_state(batch_size)))
 
   def _clip_if_enabled(self, x):
     if self._clip_value > 0:
       return tf.clip_by_value(x, -self._clip_value, self._clip_value)
     else:
       return x
+
+  def __call__(self, inputs, prev_state):
+      return self._build(inputs, prev_state)
 
   def _build(self, inputs, prev_state):
     """Connects the DNC core into the graph.
@@ -102,7 +108,7 @@ class DNC(snt.RNNCore):
     prev_access_state = prev_state.access_state
     prev_controller_state = prev_state.controller_state
 
-    batch_flatten = snt.BatchFlatten()
+    batch_flatten = tf.layers.Flatten()
     controller_input = tf.concat(
         [batch_flatten(inputs), batch_flatten(prev_access_output)], 1)
 
@@ -126,12 +132,15 @@ class DNC(snt.RNNCore):
         access_state=access_state,
         controller_state=controller_state)
 
+  def get_initial_state(self):
+    return self.initial_state(self._batch_size)
+
   def initial_state(self, batch_size, dtype=tf.float32):
     return DNCState(
-        controller_state=self._controller.initial_state(batch_size, dtype),
-        access_state=self._access.initial_state(batch_size, dtype),
+        controller_state=self._controller.initial_state(batch_size),
+        access_state=self._access.initial_state(batch_size),
         access_output=tf.zeros(
-            [batch_size] + self._access.output_size.as_list(), dtype))
+            [batch_size] + self._access.output_size.as_list(), dtype=dtype))
 
   @property
   def state_size(self):

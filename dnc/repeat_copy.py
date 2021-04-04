@@ -112,7 +112,7 @@ def bitstring_readable(data, batch_size, model_output=None, whole_batch=False):
   return '\n' + '\n\n\n\n'.join(batch_strings)
 
 
-class RepeatCopy(snt.AbstractModule):
+class RepeatCopy(snt.Module):
   """Sequence data generator for the task of repeating a random binary pattern.
 
   When called, an instance of this class will return a tuple of tensorflow ops
@@ -249,6 +249,11 @@ class RepeatCopy(snt.AbstractModule):
   def batch_size(self):
     return self._batch_size
 
+  def __call__(self):
+    self._build()
+    return self.datasettensor
+
+  @snt.once
   def _build(self):
     """Implements build method which adds ops to graph."""
 
@@ -266,9 +271,9 @@ class RepeatCopy(snt.AbstractModule):
     num_repeats_channel_idx = full_obs_size - 1
 
     # Samples each batch index's sequence length and the number of repeats.
-    sub_seq_length_batch = tf.random_uniform(
+    sub_seq_length_batch = tf.random.uniform(
         [batch_size], minval=min_length, maxval=max_length + 1, dtype=tf.int32)
-    num_repeats_batch = tf.random_uniform(
+    num_repeats_batch = tf.random.uniform(
         [batch_size], minval=min_reps, maxval=max_reps + 1, dtype=tf.int32)
 
     # Pads all the batches to have the same total sequence length.
@@ -292,7 +297,7 @@ class RepeatCopy(snt.AbstractModule):
       # The observation pattern is a sequence of random binary vectors.
       obs_pattern_shape = [sub_seq_len, num_bits]
       obs_pattern = tf.cast(
-          tf.random_uniform(
+          tf.random.uniform(
               obs_pattern_shape, minval=0, maxval=2, dtype=tf.int32),
           tf.float32)
 
@@ -374,7 +379,8 @@ class RepeatCopy(snt.AbstractModule):
     targ = tf.reshape(tf.concat(targ_tensors, 1), targ_batch_shape)
     mask = tf.transpose(
         tf.reshape(tf.concat(mask_tensors, 0), mask_batch_trans_shape))
-    return DatasetTensors(obs, targ, mask)
+
+    self.datasettensor = DatasetTensors(obs, targ, mask)
 
   def cost(self, logits, targ, mask):
     return masked_sigmoid_cross_entropy(
