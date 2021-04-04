@@ -42,7 +42,7 @@ class MemoryAccessTest(tf.test.TestCase):
     self.initial_state = self.module.initial_state(BATCH_SIZE)
 
   def testBuildAndTrain(self):
-    inputs = tf.random_normal([TIME_STEPS, BATCH_SIZE, INPUT_SIZE])
+    inputs = tf.random.normal([TIME_STEPS, BATCH_SIZE, INPUT_SIZE])
 
     output, _ = rnn.dynamic_rnn(
         cell=self.module,
@@ -51,9 +51,9 @@ class MemoryAccessTest(tf.test.TestCase):
         time_major=True)
 
     targets = np.random.rand(TIME_STEPS, BATCH_SIZE, NUM_READS, WORD_SIZE)
-    loss = tf.reduce_mean(tf.square(output - targets))
-    train_op = tf.train.GradientDescentOptimizer(1).minimize(loss)
-    init = tf.global_variables_initializer()
+    loss = tf.reduce_mean(input_tensor=tf.square(output - targets))
+    train_op = tf.compat.v1.train.GradientDescentOptimizer(1).minimize(loss)
+    init = tf.compat.v1.global_variables_initializer()
 
     with self.test_session():
       init.run()
@@ -61,8 +61,8 @@ class MemoryAccessTest(tf.test.TestCase):
 
   def testValidReadMode(self):
     inputs = self.module._read_inputs(
-        tf.random_normal([BATCH_SIZE, INPUT_SIZE]))
-    init = tf.global_variables_initializer()
+        tf.random.normal([BATCH_SIZE, INPUT_SIZE]))
+    init = tf.compat.v1.global_variables_initializer()
 
     with self.test_session() as sess:
       init.run()
@@ -145,7 +145,7 @@ class MemoryAccessTest(tf.test.TestCase):
   def testGradients(self):
     inputs = tf.constant(np.random.randn(BATCH_SIZE, INPUT_SIZE), tf.float32)
     output, _ = self.module(inputs, self.initial_state)
-    loss = tf.reduce_sum(output)
+    loss = tf.reduce_sum(input_tensor=output)
 
     tensors_to_check = [
         inputs, self.initial_state.memory, self.initial_state.read_weights,
@@ -154,8 +154,8 @@ class MemoryAccessTest(tf.test.TestCase):
     ]
     shapes = [x.get_shape().as_list() for x in tensors_to_check]
     with self.test_session() as sess:
-      sess.run(tf.global_variables_initializer())
-      err = tf.test.compute_gradient_error(tensors_to_check, shapes, loss, [1])
+      sess.run(tf.compat.v1.global_variables_initializer())
+      err = tf.compat.v1.test.compute_gradient_error(tensors_to_check, shapes, loss, [1])
       self.assertLess(err, 0.1)
 
 

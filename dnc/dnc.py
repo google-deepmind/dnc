@@ -110,7 +110,7 @@ class DNC(snt.RNNCore):
         controller_input, prev_controller_state)
 
     controller_output = self._clip_if_enabled(controller_output)
-    controller_state = tf.contrib.framework.nest.map_structure(self._clip_if_enabled, controller_state)
+    controller_state = tf.nest.map_structure(self._clip_if_enabled, controller_state)
 
     access_output, access_state = self._access(controller_output,
                                                prev_access_state)

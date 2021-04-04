@@ -50,18 +50,18 @@ def masked_sigmoid_cross_entropy(logits,
     A `Tensor` representing the log-probability of the target.
   """
   xent = tf.nn.sigmoid_cross_entropy_with_logits(labels=target, logits=logits)
-  loss_time_batch = tf.reduce_sum(xent, axis=2)
-  loss_batch = tf.reduce_sum(loss_time_batch * mask, axis=0)
+  loss_time_batch = tf.reduce_sum(input_tensor=xent, axis=2)
+  loss_batch = tf.reduce_sum(input_tensor=loss_time_batch * mask, axis=0)
 
-  batch_size = tf.cast(tf.shape(logits)[1], dtype=loss_time_batch.dtype)
+  batch_size = tf.cast(tf.shape(input=logits)[1], dtype=loss_time_batch.dtype)
 
   if time_average:
-    mask_count = tf.reduce_sum(mask, axis=0)
+    mask_count = tf.reduce_sum(input_tensor=mask, axis=0)
     loss_batch /= (mask_count + np.finfo(np.float32).eps)
 
-  loss = tf.reduce_sum(loss_batch) / batch_size
+  loss = tf.reduce_sum(input_tensor=loss_batch) / batch_size
   if log_prob_in_bits:
-    loss /= tf.log(2.)
+    loss /= tf.math.log(2.)
 
   return loss
 
@@ -266,14 +266,14 @@ class RepeatCopy(snt.AbstractModule):
     num_repeats_channel_idx = full_obs_size - 1
 
     # Samples each batch index's sequence length and the number of repeats.
-    sub_seq_length_batch = tf.random_uniform(
+    sub_seq_length_batch = tf.random.uniform(
         [batch_size], minval=min_length, maxval=max_length + 1, dtype=tf.int32)
-    num_repeats_batch = tf.random_uniform(
+    num_repeats_batch = tf.random.uniform(
         [batch_size], minval=min_reps, maxval=max_reps + 1, dtype=tf.int32)
 
     # Pads all the batches to have the same total sequence length.
     total_length_batch = sub_seq_length_batch * (num_repeats_batch + 1) + 3
-    max_length_batch = tf.reduce_max(total_length_batch)
+    max_length_batch = tf.reduce_max(input_tensor=total_length_batch)
     residual_length_batch = max_length_batch - total_length_batch
 
     obs_batch_shape = [max_length_batch, batch_size, full_obs_size]
@@ -292,7 +292,7 @@ class RepeatCopy(snt.AbstractModule):
       # The observation pattern is a sequence of random binary vectors.
       obs_pattern_shape = [sub_seq_len, num_bits]
       obs_pattern = tf.cast(
-          tf.random_uniform(
+          tf.random.uniform(
               obs_pattern_shape, minval=0, maxval=2, dtype=tf.int32),
           tf.float32)
 
@@ -373,7 +373,7 @@ class RepeatCopy(snt.AbstractModule):
     obs = tf.reshape(tf.concat(obs_tensors, 1), obs_batch_shape)
     targ = tf.reshape(tf.concat(targ_tensors, 1), targ_batch_shape)
     mask = tf.transpose(
-        tf.reshape(tf.concat(mask_tensors, 0), mask_batch_trans_shape))
+        a=tf.reshape(tf.concat(mask_tensors, 0), mask_batch_trans_shape))
     return DatasetTensors(obs, targ, mask)
 
   def cost(self, logits, targ, mask):

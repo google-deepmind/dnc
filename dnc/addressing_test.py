@@ -36,9 +36,9 @@ class WeightedSoftmaxTest(tf.test.TestCase):
     activations_data = np.random.randn(batch_size, num_heads, memory_size)
     weights_data = np.ones((batch_size, num_heads))
 
-    activations = tf.placeholder(tf.float32,
+    activations = tf.compat.v1.placeholder(tf.float32,
                                  [batch_size, num_heads, memory_size])
-    weights = tf.placeholder(tf.float32, [batch_size, num_heads])
+    weights = tf.compat.v1.placeholder(tf.float32, [batch_size, num_heads])
     # Run weighted softmax with identity placed on weights. Output should be
     # equal to a standalone softmax.
     observed = addressing.weighted_softmax(activations, weights, tf.identity)
@@ -62,9 +62,9 @@ class CosineWeightsTest(tf.test.TestCase):
     word_size = 2
 
     module = addressing.CosineWeights(num_heads, word_size)
-    mem = tf.placeholder(tf.float32, [batch_size, memory_size, word_size])
-    keys = tf.placeholder(tf.float32, [batch_size, num_heads, word_size])
-    strengths = tf.placeholder(tf.float32, [batch_size, num_heads])
+    mem = tf.compat.v1.placeholder(tf.float32, [batch_size, memory_size, word_size])
+    keys = tf.compat.v1.placeholder(tf.float32, [batch_size, num_heads, word_size])
+    strengths = tf.compat.v1.placeholder(tf.float32, [batch_size, num_heads])
     weights = module(mem, keys, strengths)
     self.assertTrue(weights.get_shape().is_compatible_with(
         [batch_size, num_heads, memory_size]))
@@ -88,9 +88,9 @@ class CosineWeightsTest(tf.test.TestCase):
     strengths_data = np.random.randn(batch_size, num_heads)
 
     module = addressing.CosineWeights(num_heads, word_size)
-    mem = tf.placeholder(tf.float32, [batch_size, memory_size, word_size])
-    keys = tf.placeholder(tf.float32, [batch_size, num_heads, word_size])
-    strengths = tf.placeholder(tf.float32, [batch_size, num_heads])
+    mem = tf.compat.v1.placeholder(tf.float32, [batch_size, memory_size, word_size])
+    keys = tf.compat.v1.placeholder(tf.float32, [batch_size, num_heads, word_size])
+    strengths = tf.compat.v1.placeholder(tf.float32, [batch_size, num_heads])
     weights = module(mem, keys, strengths)
 
     with self.test_session() as sess:
@@ -124,8 +124,8 @@ class CosineWeightsTest(tf.test.TestCase):
     word_size = 2
 
     module = addressing.CosineWeights(num_heads, word_size)
-    keys = tf.random_normal([batch_size, num_heads, word_size])
-    strengths = tf.random_normal([batch_size, num_heads])
+    keys = tf.random.normal([batch_size, num_heads, word_size])
+    strengths = tf.random.normal([batch_size, num_heads])
 
     # First row of memory is non-zero to concentrate attention on this location.
     # Remaining rows are all zero.
@@ -135,7 +135,7 @@ class CosineWeightsTest(tf.test.TestCase):
     mem = tf.concat((first_row_ones, remaining_zeros), 1)
 
     output = module(mem, keys, strengths)
-    gradients = tf.gradients(output, [mem, keys, strengths])
+    gradients = tf.gradients(ys=output, xs=[mem, keys, strengths])
 
     with self.test_session() as sess:
       output, gradients = sess.run([output, gradients])
@@ -155,11 +155,11 @@ class TemporalLinkageTest(tf.test.TestCase):
     module = addressing.TemporalLinkage(
         memory_size=memory_size, num_writes=num_writes)
 
-    prev_link_in = tf.placeholder(
+    prev_link_in = tf.compat.v1.placeholder(
         tf.float32, (batch_size, num_writes, memory_size, memory_size))
-    prev_precedence_weights_in = tf.placeholder(
+    prev_precedence_weights_in = tf.compat.v1.placeholder(
         tf.float32, (batch_size, num_writes, memory_size))
-    write_weights_in = tf.placeholder(tf.float32,
+    write_weights_in = tf.compat.v1.placeholder(tf.float32,
                                       (batch_size, num_writes, memory_size))
 
     state = addressing.TemporalLinkageState(
@@ -376,7 +376,7 @@ class FreenessTest(tf.test.TestCase):
     weights = module.write_allocation_weights(usage, write_gates, num_writes)
 
     with self.test_session():
-      err = tf.test.compute_gradient_error(
+      err = tf.compat.v1.test.compute_gradient_error(
           [usage, write_gates],
           [usage.get_shape().as_list(), write_gates.get_shape().as_list()],
           weights,
@@ -407,7 +407,7 @@ class FreenessTest(tf.test.TestCase):
     module = addressing.Freeness(memory_size)
     allocation = module._allocation(usage)
     with self.test_session():
-      err = tf.test.compute_gradient_error(
+      err = tf.compat.v1.test.compute_gradient_error(
           usage,
           usage.get_shape().as_list(),
           allocation,

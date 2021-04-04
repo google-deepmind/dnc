@@ -49,14 +49,14 @@ def _erase_and_write(memory, address, reset_weights, values):
   Returns:
     3-D tensor of shape `[batch_size, num_writes, word_size]`.
   """
-  with tf.name_scope('erase_memory', values=[memory, address, reset_weights]):
+  with tf.compat.v1.name_scope('erase_memory', values=[memory, address, reset_weights]):
     expand_address = tf.expand_dims(address, 3)
     reset_weights = tf.expand_dims(reset_weights, 2)
     weighted_resets = expand_address * reset_weights
     reset_gate = util.reduce_prod(1 - weighted_resets, 1)
     memory *= reset_gate
 
-  with tf.name_scope('additive_write', values=[memory, address, values]):
+  with tf.compat.v1.name_scope('additive_write', values=[memory, address, values]):
     add_matrix = tf.matmul(address, values, adjoint_a=True)
     memory += add_matrix
 
@@ -236,7 +236,7 @@ class MemoryAccess(snt.RNNCore):
       tensor of shape `[batch_size, num_writes, memory_size]` indicating where
           to write to (if anywhere) for each write head.
     """
-    with tf.name_scope('write_weights', values=[inputs, memory, usage]):
+    with tf.compat.v1.name_scope('write_weights', values=[inputs, memory, usage]):
       # c_t^{w, i} - The content-based weights for each write head.
       write_content_weights = self._write_content_weights_mod(
           memory, inputs['write_content_keys'],
@@ -278,7 +278,7 @@ class MemoryAccess(snt.RNNCore):
       A tensor of shape `[batch_size, num_reads, memory_size]` containing the
       read weights for each read head.
     """
-    with tf.name_scope(
+    with tf.compat.v1.name_scope(
         'read_weights', values=[inputs, memory, prev_read_weights, link]):
       # c_t^{r, i} - The content weightings for each read head.
       content_weights = self._read_content_weights_mod(
@@ -297,8 +297,8 @@ class MemoryAccess(snt.RNNCore):
 
       read_weights = (
           tf.expand_dims(content_mode, 2) * content_weights + tf.reduce_sum(
-              tf.expand_dims(forward_mode, 3) * forward_weights, 2) +
-          tf.reduce_sum(tf.expand_dims(backward_mode, 3) * backward_weights, 2))
+              input_tensor=tf.expand_dims(forward_mode, 3) * forward_weights, axis=2) +
+          tf.reduce_sum(input_tensor=tf.expand_dims(backward_mode, 3) * backward_weights, axis=2))
 
       return read_weights
 

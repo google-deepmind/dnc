@@ -82,7 +82,7 @@ def run_model(input_sequence, output_size):
 
   dnc_core = dnc.DNC(access_config, controller_config, output_size, clip_value)
   initial_state = dnc_core.initial_state(FLAGS.batch_size)
-  output_sequence, _ = tf.nn.dynamic_rnn(
+  output_sequence, _ = tf.compat.v1.nn.dynamic_rnn(
       cell=dnc_core,
       inputs=input_sequence,
       time_major=True,
@@ -108,28 +108,28 @@ def train(num_training_iterations, report_interval):
                             dataset_tensors.mask)
 
   # Set up optimizer with global norm clipping.
-  trainable_variables = tf.trainable_variables()
+  trainable_variables = tf.compat.v1.trainable_variables()
   grads, _ = tf.clip_by_global_norm(
-      tf.gradients(train_loss, trainable_variables), FLAGS.max_grad_norm)
+      tf.gradients(ys=train_loss, xs=trainable_variables), FLAGS.max_grad_norm)
 
-  global_step = tf.get_variable(
+  global_step = tf.compat.v1.get_variable(
       name="global_step",
       shape=[],
       dtype=tf.int64,
-      initializer=tf.zeros_initializer(),
+      initializer=tf.compat.v1.zeros_initializer(),
       trainable=False,
-      collections=[tf.GraphKeys.GLOBAL_VARIABLES, tf.GraphKeys.GLOBAL_STEP])
+      collections=[tf.compat.v1.GraphKeys.GLOBAL_VARIABLES, tf.compat.v1.GraphKeys.GLOBAL_STEP])
 
-  optimizer = tf.train.RMSPropOptimizer(
+  optimizer = tf.compat.v1.train.RMSPropOptimizer(
       FLAGS.learning_rate, epsilon=FLAGS.optimizer_epsilon)
   train_step = optimizer.apply_gradients(
       zip(grads, trainable_variables), global_step=global_step)
 
-  saver = tf.train.Saver()
+  saver = tf.compat.v1.train.Saver()
 
   if FLAGS.checkpoint_interval > 0:
     hooks = [
-        tf.train.CheckpointSaverHook(
+        tf.estimator.CheckpointSaverHook(
             checkpoint_dir=FLAGS.checkpoint_dir,
             save_steps=FLAGS.checkpoint_interval,
             saver=saver)
@@ -138,7 +138,7 @@ def train(num_training_iterations, report_interval):
     hooks = []
 
   # Train.
-  with tf.train.SingularMonitoredSession(
+  with tf.compat.v1.train.SingularMonitoredSession(
       hooks=hooks, checkpoint_dir=FLAGS.checkpoint_dir) as sess:
 
     start_iteration = sess.run(global_step)
@@ -152,16 +152,16 @@ def train(num_training_iterations, report_interval):
         dataset_tensors_np, output_np = sess.run([dataset_tensors, output])
         dataset_string = dataset.to_human_readable(dataset_tensors_np,
                                                    output_np)
-        tf.logging.info("%d: Avg training loss %f.\n%s",
+        tf.compat.v1.logging.info("%d: Avg training loss %f.\n%s",
                         train_iteration, total_loss / report_interval,
                         dataset_string)
         total_loss = 0
 
 
 def main(unused_argv):
-  tf.logging.set_verbosity(3)  # Print INFO log messages.
+  tf.compat.v1.logging.set_verbosity(3)  # Print INFO log messages.
   train(FLAGS.num_training_iterations, FLAGS.report_interval)
 
 
 if __name__ == "__main__":
-  tf.app.run()
+  tf.compat.v1.app.run()
