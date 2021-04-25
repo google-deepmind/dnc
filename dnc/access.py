@@ -22,8 +22,7 @@ import collections
 import sonnet as snt
 import tensorflow as tf
 
-from dnc import addressing
-from dnc import util
+from dnc import addressing, util
 
 AccessState = collections.namedtuple('AccessState', (
     'memory', 'read_weights', 'write_weights', 'linkage', 'usage'))
@@ -102,6 +101,8 @@ class MemoryAccess(snt.RNNCore):
     self._num_reads = num_reads
     self._num_writes = num_writes
 
+    self._dtype = tf.float64
+
     self._write_content_weights_mod = addressing.CosineWeights(
         num_writes, word_size, name='write_content_weights')
     self._read_content_weights_mod = addressing.CosineWeights(
@@ -110,7 +111,53 @@ class MemoryAccess(snt.RNNCore):
     self._linkage = addressing.TemporalLinkage(memory_size, num_writes)
     self._freeness = addressing.Freeness(memory_size)
 
-  def _build(self, inputs, prev_state):
+    self.initialize()
+
+  @snt.once
+  def initialize(self):
+      def _linear(first_dim, second_dim, name, activation=None):
+          """Returns a linear transformation of `inputs`, followed by a reshape."""
+          linear = snt.Linear(first_dim * second_dim, name=name)
+          def call(inputs):
+              output = linear(inputs)
+              if activation is not None:
+                  output = activation(output, name=name + '_activation')
+              return tf.reshape(output, [-1, first_dim, second_dim])
+          return call
+
+      # v_t^i - The vectors to write to memory, for each write head `i`.
+      self.write_vectors = _linear(self._num_writes, self._word_size, 'write_vectors')
+
+      # e_t^i - Amount to erase the memory by before writing, for each write head.
+      self.erase_vectors = _linear(self._num_writes, self._word_size, 'erase_vectors',
+                              tf.sigmoid)
+
+      # f_t^j - Amount that the memory at the locations read from at the previous
+      # time step can be declared unused, for each read head `j`.
+      self.free_gate = snt.Linear(self._num_reads, name='free_gate')
+
+      # g_t^{a, i} - Interpolation between writing to unallocated memory and
+      # content-based lookup, for each write head `i`. Note: `a` is simply used to
+      # identify this gate with allocation vs writing (as defined below).
+      self.allocation_gate = snt.Linear(self._num_writes, name='allocation_gate')
+
+      # g_t^{w, i} - Overall gating of write amount for each write head.
+      self.write_gate = snt.Linear(self._num_writes, name='write_gate')
+
+      # \pi_t^j - Mixing between "backwards" and "forwards" positions (for
+      # each write head), and content-based lookup, for each read head.
+      self.num_read_modes = 1 + 2 * self._num_writes
+      self.read_mode = _linear(self._num_reads, self.num_read_modes, name='read_mode')
+
+      # Parameters for the (read / write) "weights by content matching" modules.
+      self.write_keys = _linear(self._num_writes, self._word_size, 'write_keys')
+      self.write_strengths = snt.Linear(self._num_writes, name='write_strengths')
+
+      self.read_keys = _linear(self._num_reads, self._word_size, 'read_keys')
+      self.read_strengths = snt.Linear(self._num_reads, name='read_strengths')
+
+
+  def __call__(self, inputs, prev_state):
     """Connects the MemoryAccess module into the graph.
 
     Args:
@@ -123,6 +170,7 @@ class MemoryAccess(snt.RNNCore):
       `[batch_size, num_reads, word_size]`, and `next_state` is the new
       `AccessState` named tuple at the current time t.
     """
+    #import ipdb; ipdb.set_trace()
     inputs = self._read_inputs(inputs)
 
     # Update usage using inputs['free_gate'] and previous read & write weights.
@@ -160,48 +208,34 @@ class MemoryAccess(snt.RNNCore):
   def _read_inputs(self, inputs):
     """Applies transformations to `inputs` to get control for this module."""
 
-    def _linear(first_dim, second_dim, name, activation=None):
-      """Returns a linear transformation of `inputs`, followed by a reshape."""
-      linear = snt.Linear(first_dim * second_dim, name=name)(inputs)
-      if activation is not None:
-        linear = activation(linear, name=name + '_activation')
-      return tf.reshape(linear, [-1, first_dim, second_dim])
-
     # v_t^i - The vectors to write to memory, for each write head `i`.
-    write_vectors = _linear(self._num_writes, self._word_size, 'write_vectors')
+    write_vectors = self.write_vectors(inputs)
 
     # e_t^i - Amount to erase the memory by before writing, for each write head.
-    erase_vectors = _linear(self._num_writes, self._word_size, 'erase_vectors',
-                            tf.sigmoid)
+    erase_vectors = self.erase_vectors(inputs)
 
     # f_t^j - Amount that the memory at the locations read from at the previous
     # time step can be declared unused, for each read head `j`.
-    free_gate = tf.sigmoid(
-        snt.Linear(self._num_reads, name='free_gate')(inputs))
+    free_gate = tf.sigmoid(self.free_gate(inputs))
 
     # g_t^{a, i} - Interpolation between writing to unallocated memory and
     # content-based lookup, for each write head `i`. Note: `a` is simply used to
     # identify this gate with allocation vs writing (as defined below).
-    allocation_gate = tf.sigmoid(
-        snt.Linear(self._num_writes, name='allocation_gate')(inputs))
+    allocation_gate = tf.sigmoid(self.allocation_gate(inputs))
 
     # g_t^{w, i} - Overall gating of write amount for each write head.
-    write_gate = tf.sigmoid(
-        snt.Linear(self._num_writes, name='write_gate')(inputs))
+    write_gate = tf.sigmoid(self.write_gate(inputs))
 
     # \pi_t^j - Mixing between "backwards" and "forwards" positions (for
     # each write head), and content-based lookup, for each read head.
-    num_read_modes = 1 + 2 * self._num_writes
-    read_mode = snt.BatchApply(tf.nn.softmax)(
-        _linear(self._num_reads, num_read_modes, name='read_mode'))
+    read_mode = snt.BatchApply(tf.nn.softmax)(self.read_mode(inputs))
 
     # Parameters for the (read / write) "weights by content matching" modules.
-    write_keys = _linear(self._num_writes, self._word_size, 'write_keys')
-    write_strengths = snt.Linear(self._num_writes, name='write_strengths')(
-        inputs)
+    write_keys = self.write_keys(inputs)
+    write_strengths = self.write_strengths(inputs)
 
-    read_keys = _linear(self._num_reads, self._word_size, 'read_keys')
-    read_strengths = snt.Linear(self._num_reads, name='read_strengths')(inputs)
+    read_keys = self.read_keys(inputs)
+    read_strengths = self.read_strengths(inputs)
 
     result = {
         'read_content_keys': read_keys,
@@ -301,6 +335,12 @@ class MemoryAccess(snt.RNNCore):
           tf.reduce_sum(input_tensor=tf.expand_dims(backward_mode, 3) * backward_weights, axis=2))
 
       return read_weights
+
+  def initial_state(self, batch_size):
+    return util.initial_state_from_state_size(self.state_size, batch_size, self._dtype)
+
+  def get_initial_state(self, batch_size):
+      return self.initial_state(batch_size)
 
   @property
   def state_size(self):

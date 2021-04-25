@@ -112,7 +112,7 @@ def bitstring_readable(data, batch_size, model_output=None, whole_batch=False):
   return '\n' + '\n\n\n\n'.join(batch_strings)
 
 
-class RepeatCopy(snt.AbstractModule):
+class RepeatCopy(snt.Module):
   """Sequence data generator for the task of repeating a random binary pattern.
 
   When called, an instance of this class will return a tuple of tensorflow ops
@@ -184,7 +184,8 @@ class RepeatCopy(snt.AbstractModule):
       norm_max=10,
       log_prob_in_bits=False,
       time_average_cost=False,
-      name='repeat_copy',):
+      name='repeat_copy',
+      dtype=tf.float64):
     """Creates an instance of RepeatCopy task.
 
     Args:
@@ -220,6 +221,7 @@ class RepeatCopy(snt.AbstractModule):
     self._norm_max = norm_max
     self._log_prob_in_bits = log_prob_in_bits
     self._time_average_cost = time_average_cost
+    self._dtype=dtype
 
   def _normalise(self, val):
     return val / self._norm_max
@@ -249,6 +251,11 @@ class RepeatCopy(snt.AbstractModule):
   def batch_size(self):
     return self._batch_size
 
+  def __call__(self):
+    self._build()
+    return self.datasettensor
+
+  @snt.once
   def _build(self):
     """Implements build method which adds ops to graph."""
 
@@ -370,11 +377,11 @@ class RepeatCopy(snt.AbstractModule):
     ]
 
     # Concatenate each batch element into a single tensor.
-    obs = tf.reshape(tf.concat(obs_tensors, 1), obs_batch_shape)
-    targ = tf.reshape(tf.concat(targ_tensors, 1), targ_batch_shape)
-    mask = tf.transpose(
-        a=tf.reshape(tf.concat(mask_tensors, 0), mask_batch_trans_shape))
-    return DatasetTensors(obs, targ, mask)
+    obs = tf.cast(tf.reshape(tf.concat(obs_tensors, 1), obs_batch_shape), dtype=self._dtype)
+    targ = tf.cast(tf.reshape(tf.concat(targ_tensors, 1), targ_batch_shape), dtype=self._dtype)
+    mask = tf.cast(tf.transpose(
+        a=tf.reshape(tf.concat(mask_tensors, 0), mask_batch_trans_shape)), dtype=self._dtype)
+    self.datasettensor = DatasetTensors(obs, targ, mask)
 
   def cost(self, logits, targ, mask):
     return masked_sigmoid_cross_entropy(

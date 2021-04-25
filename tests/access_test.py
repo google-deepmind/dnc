@@ -22,8 +22,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.python.ops import rnn
 
-from dnc import access
-from dnc import util
+from dnc import access, addressing, util
 
 BATCH_SIZE = 2
 MEMORY_SIZE = 20
@@ -42,37 +41,32 @@ class MemoryAccessTest(tf.test.TestCase):
     self.initial_state = self.module.initial_state(BATCH_SIZE)
 
   def testBuildAndTrain(self):
-    inputs = tf.random.normal([TIME_STEPS, BATCH_SIZE, INPUT_SIZE])
-
-    output, _ = rnn.dynamic_rnn(
-        cell=self.module,
-        inputs=inputs,
-        initial_state=self.initial_state,
-        time_major=True)
-
+    inputs = tf.random.normal([TIME_STEPS, BATCH_SIZE, INPUT_SIZE], dtype=tf.float64)
     targets = np.random.rand(TIME_STEPS, BATCH_SIZE, NUM_READS, WORD_SIZE)
-    loss = tf.reduce_mean(input_tensor=tf.square(output - targets))
-    train_op = tf.compat.v1.train.GradientDescentOptimizer(1).minimize(loss)
-    init = tf.compat.v1.global_variables_initializer()
+    loss = lambda outputs, targets: tf.reduce_mean(input_tensor=tf.square(outputs - targets))
 
-    with self.test_session():
-      init.run()
-      train_op.run()
+    with tf.GradientTape() as tape:
+        outputs, _ = rnn.dynamic_rnn(
+            cell=self.module,
+            inputs=inputs,
+            initial_state=self.initial_state,
+            time_major=True)
+        loss_value = loss(outputs, targets)
+        gradients = tape.gradient(loss_value, self.module.trainable_variables)
+
+    optimizer = tf.keras.optimizers.SGD(learning_rate=0.1)
+    optimizer.apply_gradients(zip(gradients, self.module.trainable_variables))
 
   def testValidReadMode(self):
     inputs = self.module._read_inputs(
-        tf.random.normal([BATCH_SIZE, INPUT_SIZE]))
+        tf.random.normal([BATCH_SIZE, INPUT_SIZE], dtype=tf.float64))
     init = tf.compat.v1.global_variables_initializer()
-
-    with self.test_session() as sess:
-      init.run()
-      inputs = sess.run(inputs)
 
     # Check that the read modes for each read head constitute a probability
     # distribution.
-    self.assertAllClose(inputs['read_mode'].sum(2),
+    self.assertAllClose(inputs['read_mode'].numpy().sum(2),
                         np.ones([BATCH_SIZE, NUM_READS]))
-    self.assertGreaterEqual(inputs['read_mode'].min(), 0)
+    self.assertGreaterEqual(inputs['read_mode'].numpy().min(), 0)
 
   def testWriteWeights(self):
     memory = 10 * (np.random.rand(BATCH_SIZE, MEMORY_SIZE, WORD_SIZE) - 0.5)
@@ -100,8 +94,7 @@ class MemoryAccessTest(tf.test.TestCase):
                                          tf.constant(memory),
                                          tf.constant(usage))
 
-    with self.test_session():
-      weights = weights.eval()
+    weights = weights.numpy()
 
     # Check the weights sum to their target gating.
     self.assertAllClose(np.sum(weights, axis=2), write_gate, atol=5e-2)
@@ -135,28 +128,45 @@ class MemoryAccessTest(tf.test.TestCase):
     }
     read_weights = self.module._read_weights(inputs, memory, prev_read_weights,
                                              link)
-    with self.test_session():
-      read_weights = read_weights.eval()
+    read_weights = read_weights.numpy()
+
 
     # read_weights for batch 0, read head 0 should be memory location 3
     self.assertAllClose(
         read_weights[0, 0, :], util.one_hot(MEMORY_SIZE, 3), atol=1e-3)
 
   def testGradients(self):
-    inputs = tf.constant(np.random.randn(BATCH_SIZE, INPUT_SIZE), tf.float32)
-    output, _ = self.module(inputs, self.initial_state)
-    loss = tf.reduce_sum(input_tensor=output)
+    inputs = tf.constant(np.random.randn(BATCH_SIZE, INPUT_SIZE), tf.float64)
+    def evaluate_module(inputs, memory, read_weights, precedence_weights, link):
+        initial_state = access.AccessState(
+            memory=memory,
+            read_weights=read_weights,
+            write_weights=self.initial_state.write_weights,
+            linkage=addressing.TemporalLinkageState(
+                precedence_weights=precedence_weights,
+                link=link
+            ),
+            usage=self.initial_state.usage
+        )
+        output, _ = self.module(inputs, initial_state)
+        loss = tf.reduce_sum(input_tensor=output)
+        return loss
 
     tensors_to_check = [
         inputs, self.initial_state.memory, self.initial_state.read_weights,
         self.initial_state.linkage.precedence_weights,
         self.initial_state.linkage.link
     ]
-    shapes = [x.get_shape().as_list() for x in tensors_to_check]
-    with self.test_session() as sess:
-      sess.run(tf.compat.v1.global_variables_initializer())
-      err = tf.compat.v1.test.compute_gradient_error(tensors_to_check, shapes, loss, [1])
-      self.assertLess(err, 0.1)
+
+    theoretical, numerical = tf.test.compute_gradient(
+        evaluate_module,
+        tensors_to_check,
+        delta=1e-5
+    )
+    self.assertLess(
+        sum([tf.norm(numerical[i] - theoretical[i]) for i in range(2)]),
+        0.01
+    )
 
 
 if __name__ == '__main__':

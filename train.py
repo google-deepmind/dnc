@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import sonnet as snt
 
 from dnc import dnc
@@ -65,25 +65,13 @@ tf.flags.DEFINE_string("checkpoint_dir", "/tmp/tf/dnc",
 tf.flags.DEFINE_integer("checkpoint_interval", -1,
                         "Checkpointing step interval.")
 
-
-def run_model(input_sequence, output_size):
+@tf.function
+def run_model(input_sequence, rnn_model):
   """Runs model on input sequence."""
-
-  access_config = {
-      "memory_size": FLAGS.memory_size,
-      "word_size": FLAGS.word_size,
-      "num_reads": FLAGS.num_read_heads,
-      "num_writes": FLAGS.num_write_heads,
-  }
-  controller_config = {
-      "hidden_size": FLAGS.hidden_size,
-  }
-  clip_value = FLAGS.clip_value
-
-  dnc_core = dnc.DNC(access_config, controller_config, output_size, clip_value)
-  initial_state = dnc_core.initial_state(FLAGS.batch_size)
-  output_sequence, _ = tf.compat.v1.nn.dynamic_rnn(
-      cell=dnc_core,
+  initial_state = rnn_model.get_initial_state()
+  import ipdb; ipdb.set_trace()
+  output_sequence, _ = tf.nn.dynamic_rnn(
+      cell=rnn_model,
       inputs=input_sequence,
       time_major=True,
       initial_state=initial_state)
@@ -96,10 +84,40 @@ def train(num_training_iterations, report_interval):
 
   dataset = repeat_copy.RepeatCopy(FLAGS.num_bits, FLAGS.batch_size,
                                    FLAGS.min_length, FLAGS.max_length,
-                                   FLAGS.min_repeats, FLAGS.max_repeats)
+                                   FLAGS.min_repeats, FLAGS.max_repeats,
+                                   dtype=tf.float64)
   dataset_tensors = dataset()
 
-  output_logits = run_model(dataset_tensors.observations, dataset.target_size)
+  access_config = {
+      "memory_size": FLAGS.memory_size,
+      "word_size": FLAGS.word_size,
+      "num_reads": FLAGS.num_read_heads,
+      "num_writes": FLAGS.num_write_heads,
+  }
+  controller_config = {
+      "hidden_size": FLAGS.hidden_size,
+  }
+  clip_value = FLAGS.clip_value
+
+  dnc_core = dnc.DNC(
+    access_config, controller_config, dataset.target_size, FLAGS.batch_size, clip_value)
+
+  import ipdb; ipdb.set_trace()
+  # Set up logging.
+  from datetime import datetime
+  import tensorflow as tf2
+  stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+  logdir = 'logs/func/%s' % stamp
+  writer = tf2.summary.create_file_writer(logdir)
+
+  tf2.summary.trace_on(graph=True, profiler=True)
+  output_logits = run_model(dataset_tensors.observations, dnc_core)
+  with writer.as_default():
+      tf2.summary.trace_export(
+          name="my_func_trace",
+          step=0,
+          profiler_outdir=logdir)
+
   # Used for visualization.
   output = tf.round(
       tf.expand_dims(dataset_tensors.mask, -1) * tf.sigmoid(output_logits))
@@ -108,9 +126,11 @@ def train(num_training_iterations, report_interval):
                             dataset_tensors.mask)
 
   # Set up optimizer with global norm clipping.
-  trainable_variables = tf.compat.v1.trainable_variables()
-  grads, _ = tf.clip_by_global_norm(
-      tf.gradients(ys=train_loss, xs=trainable_variables), FLAGS.max_grad_norm)
+  trainable_variables = dnc_core.trainable_variables
+  import ipdb; ipdb.set_trace()
+  with tf.GradientTape() as gtape:
+      grads = gtape.gradient(train_loss, trainable_variables)
+      grads, _ = tf.clip_by_global_norm(grads, FLAGS.max_grad_norm)
 
   global_step = tf.compat.v1.get_variable(
       name="global_step",

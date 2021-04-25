@@ -32,7 +32,7 @@ TemporalLinkageState = collections.namedtuple('TemporalLinkageState',
 
 
 def _vector_norms(m):
-  squared_norms = tf.reduce_sum(input_tensor=m * m, axis=2, keepdims=True)
+  squared_norms = tf.compat.v1.reduce_sum(input_tensor=m * m, axis=2, keepdims=True)
   return tf.sqrt(squared_norms + _EPSILON)
 
 
@@ -51,11 +51,11 @@ def weighted_softmax(activations, strengths, strengths_op):
   """
   transformed_strengths = tf.expand_dims(strengths_op(strengths), -1)
   sharp_activations = activations * transformed_strengths
-  softmax = snt.BatchApply(module_or_op=tf.nn.softmax)
+  softmax = snt.BatchApply(module=tf.nn.softmax)
   return softmax(sharp_activations)
 
 
-class CosineWeights(snt.AbstractModule):
+class CosineWeights(snt.Module):
   """Cosine-weighted attention.
 
   Calculates the cosine similarity between a query and each word in memory, then
@@ -79,6 +79,9 @@ class CosineWeights(snt.AbstractModule):
     self._num_heads = num_heads
     self._word_size = word_size
     self._strength_op = strength_op
+
+  def __call__(self, memory, keys, strengths):
+      return self._build(memory, keys, strengths)
 
   def _build(self, memory, keys, strengths):
     """Connects the CosineWeights module into the graph.
@@ -129,6 +132,10 @@ class TemporalLinkage(snt.RNNCore):
     super(TemporalLinkage, self).__init__(name=name)
     self._memory_size = memory_size
     self._num_writes = num_writes
+    self._dtype = tf.float64
+
+  def __call__(self, write_weights, prev_state):
+      return self._build(write_weights, prev_state)
 
   def _build(self, write_weights, prev_state):
     """Calculate the updated linkage state given the write weights.
@@ -239,15 +246,19 @@ class TemporalLinkage(snt.RNNCore):
       write_sum = tf.reduce_sum(input_tensor=write_weights, axis=2, keepdims=True)
       return (1 - write_sum) * prev_precedence_weights + write_weights
 
+  def initial_state(self, batch_size):
+      return util.initial_state_from_state_size(self.state_size, batch_size, self._dtype)
+
+
   @property
   def state_size(self):
-    """Returns a `TemporalLinkageState` tuple of the state tensors' shapes."""
-    return TemporalLinkageState(
-        link=tf.TensorShape(
-            [self._num_writes, self._memory_size, self._memory_size]),
-        precedence_weights=tf.TensorShape([self._num_writes,
-                                           self._memory_size]),)
-
+      """Returns a `TemporalLinkageState` tuple of the state tensors' shapes."""
+      return TemporalLinkageState(
+          link=tf.TensorShape(
+              [self._num_writes, self._memory_size, self._memory_size]),
+          precedence_weights=tf.TensorShape(
+              [self._num_writes, self._memory_size])
+      )
 
 class Freeness(snt.RNNCore):
   """Memory usage that is increased by writing and decreased by reading.
@@ -275,6 +286,10 @@ class Freeness(snt.RNNCore):
     """
     super(Freeness, self).__init__(name=name)
     self._memory_size = memory_size
+    self._dtype = tf.float64
+
+  def __call__(self, write_weights, free_gate, read_weights, prev_usage):
+      return self._build(write_weights, free_gate, read_weights, prev_usage)
 
   def _build(self, write_weights, free_gate, read_weights, prev_usage):
     """Calculates the new memory usage u_t.
@@ -398,11 +413,18 @@ class Freeness(snt.RNNCore):
       sorted_usage = 1 - sorted_nonusage
       prod_sorted_usage = tf.math.cumprod(sorted_usage, axis=1, exclusive=True)
       sorted_allocation = sorted_nonusage * prod_sorted_usage
-      inverse_indices = util.batch_invert_permutation(indices)
+      inverse_indices = tf.cast(
+        util.batch_invert_permutation(indices),
+        tf.int64
+      )
 
       # This final line "unsorts" sorted_allocation, so that the indexing
       # corresponds to the original indexing of `usage`.
       return util.batch_gather(sorted_allocation, inverse_indices)
+
+  # freeness size is independent of batch size
+  def initial_state(self, batch_size):
+    return util.initial_state_from_state_size(self.state_size, batch_size, self._dtype)
 
   @property
   def state_size(self):

@@ -21,7 +21,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
-from dnc import util
+import util
 
 
 class BatchInvertPermutation(tf.test.TestCase):
@@ -33,15 +33,14 @@ class BatchInvertPermutation(tf.test.TestCase):
     length = 7
 
     permutations = np.empty([batch_size, length], dtype=int)
-    for i in xrange(batch_size):
+    for i in range(batch_size):
       permutations[i] = np.random.permutation(length)
 
     inverse = util.batch_invert_permutation(tf.constant(permutations, tf.int32))
-    with self.test_session():
-      inverse = inverse.eval()
+    inverse = inverse.numpy()
 
-    for i in xrange(batch_size):
-      for j in xrange(length):
+    for i in range(batch_size):
+      for j in range(length):
         self.assertEqual(permutations[i][inverse[i][j]], j)
 
 
@@ -52,8 +51,7 @@ class BatchGather(tf.test.TestCase):
     indexs = np.array([[1, 2, 0, 3], [3, 0, 1, 2], [0, 2, 1, 3]])
     target = np.array([[1, 4, 3, 1], [6, 5, 9, 2], [5, 5, 3, 7]])
     result = util.batch_gather(tf.constant(values), tf.constant(indexs))
-    with self.test_session():
-      result = result.eval()
+    result = result.numpy()
     self.assertAllEqual(target, result)
 
 

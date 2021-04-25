@@ -22,8 +22,7 @@ import numpy as np
 import sonnet as snt
 import tensorflow as tf
 
-from dnc import addressing
-from dnc import util
+import addressing, util
 
 
 class WeightedSoftmaxTest(tf.test.TestCase):
@@ -33,24 +32,14 @@ class WeightedSoftmaxTest(tf.test.TestCase):
     num_heads = 3
     memory_size = 7
 
-    activations_data = np.random.randn(batch_size, num_heads, memory_size)
-    weights_data = np.ones((batch_size, num_heads))
+    activations = np.random.randn(batch_size, num_heads, memory_size)
+    weights = np.ones((batch_size, num_heads))
 
-    activations = tf.compat.v1.placeholder(tf.float32,
-                                 [batch_size, num_heads, memory_size])
-    weights = tf.compat.v1.placeholder(tf.float32, [batch_size, num_heads])
     # Run weighted softmax with identity placed on weights. Output should be
     # equal to a standalone softmax.
     observed = addressing.weighted_softmax(activations, weights, tf.identity)
-    expected = snt.BatchApply(
-        module_or_op=tf.nn.softmax, name='BatchSoftmax')(activations)
-    with self.test_session() as sess:
-      observed = sess.run(
-          observed,
-          feed_dict={activations: activations_data,
-                     weights: weights_data})
-      expected = sess.run(expected, feed_dict={activations: activations_data})
-      self.assertAllClose(observed, expected)
+    expected = snt.BatchApply(tf.nn.softmax, num_dims=1)((activations))
+    self.assertAllClose(observed, expected)
 
 
 class CosineWeightsTest(tf.test.TestCase):
@@ -62,9 +51,9 @@ class CosineWeightsTest(tf.test.TestCase):
     word_size = 2
 
     module = addressing.CosineWeights(num_heads, word_size)
-    mem = tf.compat.v1.placeholder(tf.float32, [batch_size, memory_size, word_size])
-    keys = tf.compat.v1.placeholder(tf.float32, [batch_size, num_heads, word_size])
-    strengths = tf.compat.v1.placeholder(tf.float32, [batch_size, num_heads])
+    mem = np.random.randn(batch_size, memory_size, word_size)
+    keys = np.random.randn(batch_size, num_heads, word_size)
+    strengths = np.random.randn(batch_size, num_heads)
     weights = module(mem, keys, strengths)
     self.assertTrue(weights.get_shape().is_compatible_with(
         [batch_size, num_heads, memory_size]))
@@ -75,47 +64,38 @@ class CosineWeightsTest(tf.test.TestCase):
     memory_size = 10
     word_size = 2
 
-    mem_data = np.random.randn(batch_size, memory_size, word_size)
-    np.copyto(mem_data[0, 0], [1, 2])
-    np.copyto(mem_data[0, 1], [3, 4])
-    np.copyto(mem_data[0, 2], [5, 6])
+    mem = np.random.randn(batch_size, memory_size, word_size)
+    np.copyto(mem[0, 0], [1, 2])
+    np.copyto(mem[0, 1], [3, 4])
+    np.copyto(mem[0, 2], [5, 6])
 
-    keys_data = np.random.randn(batch_size, num_heads, word_size)
-    np.copyto(keys_data[0, 0], [5, 6])
-    np.copyto(keys_data[0, 1], [1, 2])
-    np.copyto(keys_data[0, 2], [5, 6])
-    np.copyto(keys_data[0, 3], [3, 4])
-    strengths_data = np.random.randn(batch_size, num_heads)
+    keys = np.random.randn(batch_size, num_heads, word_size)
+    np.copyto(keys[0, 0], [5, 6])
+    np.copyto(keys[0, 1], [1, 2])
+    np.copyto(keys[0, 2], [5, 6])
+    np.copyto(keys[0, 3], [3, 4])
+    strengths = np.random.randn(batch_size, num_heads)
 
     module = addressing.CosineWeights(num_heads, word_size)
-    mem = tf.compat.v1.placeholder(tf.float32, [batch_size, memory_size, word_size])
-    keys = tf.compat.v1.placeholder(tf.float32, [batch_size, num_heads, word_size])
-    strengths = tf.compat.v1.placeholder(tf.float32, [batch_size, num_heads])
     weights = module(mem, keys, strengths)
 
-    with self.test_session() as sess:
-      result = sess.run(
-          weights,
-          feed_dict={mem: mem_data,
-                     keys: keys_data,
-                     strengths: strengths_data})
 
-      # Manually checks results.
-      strengths_softplus = np.log(1 + np.exp(strengths_data))
-      similarity = np.zeros((memory_size))
+    # Manually checks results.
+    strengths_softplus = np.log(1 + np.exp(strengths))
+    similarity = np.zeros((memory_size))
 
-      for b in xrange(batch_size):
-        for h in xrange(num_heads):
-          key = keys_data[b, h]
-          key_norm = np.linalg.norm(key)
+    for b in range(batch_size):
+        for h in range(num_heads):
+            key = keys[b, h]
+            key_norm = np.linalg.norm(key)
 
-          for m in xrange(memory_size):
-            row = mem_data[b, m]
-            similarity[m] = np.dot(key, row) / (key_norm * np.linalg.norm(row))
+            for m in range(memory_size):
+                row = mem[b, m]
+                similarity[m] = np.dot(key, row) / (key_norm * np.linalg.norm(row))
 
-          similarity = np.exp(similarity * strengths_softplus[b, h])
-          similarity /= similarity.sum()
-          self.assertAllClose(result[b, h], similarity, atol=1e-4, rtol=1e-4)
+            similarity = np.exp(similarity * strengths_softplus[b, h])
+            similarity /= similarity.sum()
+            self.assertAllClose(weights[b, h], similarity, atol=1e-4, rtol=1e-4)
 
   def testDivideByZero(self):
     batch_size = 5
@@ -124,25 +104,28 @@ class CosineWeightsTest(tf.test.TestCase):
     word_size = 2
 
     module = addressing.CosineWeights(num_heads, word_size)
-    keys = tf.random.normal([batch_size, num_heads, word_size])
-    strengths = tf.random.normal([batch_size, num_heads])
+    keys = tf.Variable(tf.random.normal([batch_size, num_heads, word_size], dtype=tf.float64))
+    strengths = tf.Variable(tf.random.normal([batch_size, num_heads], dtype=tf.float64))
 
     # First row of memory is non-zero to concentrate attention on this location.
     # Remaining rows are all zero.
-    first_row_ones = tf.ones([batch_size, 1, word_size], dtype=tf.float32)
+    first_row_ones = tf.ones([batch_size, 1, word_size], dtype=tf.float64)
     remaining_zeros = tf.zeros(
-        [batch_size, memory_size - 1, word_size], dtype=tf.float32)
-    mem = tf.concat((first_row_ones, remaining_zeros), 1)
+        [batch_size, memory_size - 1, word_size], dtype=tf.float64)
+    mem = tf.Variable(tf.concat((first_row_ones, remaining_zeros), 1))
 
-    output = module(mem, keys, strengths)
-    gradients = tf.gradients(ys=output, xs=[mem, keys, strengths])
+    with tf.GradientTape() as gtape:
+        #gtape.watch(mem)
+        #gtape.watch(keys)
+        #gtape.watch(strengths)
+        output = module(mem, keys, strengths)
+        gradients = gtape.gradient(target=output, sources=[mem, keys, strengths])
 
-    with self.test_session() as sess:
-      output, gradients = sess.run([output, gradients])
-      self.assertFalse(np.any(np.isnan(output)))
-      self.assertFalse(np.any(np.isnan(gradients[0])))
-      self.assertFalse(np.any(np.isnan(gradients[1])))
-      self.assertFalse(np.any(np.isnan(gradients[2])))
+    #import ipdb; ipdb.set_trace()
+    self.assertFalse(np.any(np.isnan(output)))
+    self.assertFalse(np.any(np.isnan(gradients[0])))
+    self.assertFalse(np.any(np.isnan(gradients[1])))
+    self.assertFalse(np.any(np.isnan(gradients[2])))
 
 
 class TemporalLinkageTest(tf.test.TestCase):
@@ -155,56 +138,49 @@ class TemporalLinkageTest(tf.test.TestCase):
     module = addressing.TemporalLinkage(
         memory_size=memory_size, num_writes=num_writes)
 
-    prev_link_in = tf.compat.v1.placeholder(
-        tf.float32, (batch_size, num_writes, memory_size, memory_size))
-    prev_precedence_weights_in = tf.compat.v1.placeholder(
-        tf.float32, (batch_size, num_writes, memory_size))
-    write_weights_in = tf.compat.v1.placeholder(tf.float32,
-                                      (batch_size, num_writes, memory_size))
-
     state = addressing.TemporalLinkageState(
         link=np.zeros([batch_size, num_writes, memory_size, memory_size]),
         precedence_weights=np.zeros([batch_size, num_writes, memory_size]))
 
-    calc_state = module(write_weights_in,
-                        addressing.TemporalLinkageState(
-                            link=prev_link_in,
-                            precedence_weights=prev_precedence_weights_in))
-
-    with self.test_session() as sess:
-      num_steps = 5
-      for i in xrange(num_steps):
+    num_steps = 5
+    for i in range(num_steps):
         write_weights = np.random.rand(batch_size, num_writes, memory_size)
         write_weights /= write_weights.sum(2, keepdims=True) + 1
 
         # Simulate (in final steps) link 0-->1 in head 0 and 3-->2 in head 1
         if i == num_steps - 2:
-          write_weights[0, 0, :] = util.one_hot(memory_size, 0)
-          write_weights[0, 1, :] = util.one_hot(memory_size, 3)
+            write_weights[0, 0, :] = util.one_hot(memory_size, 0)
+            write_weights[0, 1, :] = util.one_hot(memory_size, 3)
         elif i == num_steps - 1:
-          write_weights[0, 0, :] = util.one_hot(memory_size, 1)
-          write_weights[0, 1, :] = util.one_hot(memory_size, 2)
+            write_weights[0, 0, :] = util.one_hot(memory_size, 1)
+            write_weights[0, 1, :] = util.one_hot(memory_size, 2)
 
-        state = sess.run(
-            calc_state,
-            feed_dict={
-                prev_link_in: state.link,
-                prev_precedence_weights_in: state.precedence_weights,
-                write_weights_in: write_weights
-            })
+        prev_link_in = state.link
+        prev_precedence_weights_in = state.precedence_weights
+        write_weights_in = write_weights
+
+        state = module(
+            write_weights_in,
+            addressing.TemporalLinkageState(
+                link=prev_link_in,
+                precedence_weights=prev_precedence_weights_in
+            )
+        )
 
     # link should be bounded in range [0, 1]
-    self.assertGreaterEqual(state.link.min(), 0)
-    self.assertLessEqual(state.link.max(), 1)
+    self.assertGreaterEqual(tf.math.reduce_min(state.link), 0)
+    self.assertLessEqual(tf.math.reduce_max(state.link), 1)
 
     # link diagonal should be zero
     self.assertAllEqual(
-        state.link[:, :, range(memory_size), range(memory_size)],
+        tf.linalg.diag_part(state.link),
         np.zeros([batch_size, num_writes, memory_size]))
 
     # link rows and columns should sum to at most 1
-    self.assertLessEqual(state.link.sum(2).max(), 1)
-    self.assertLessEqual(state.link.sum(3).max(), 1)
+    self.assertLessEqual(
+        tf.math.reduce_max(tf.math.reduce_sum(state.link, axis=2)), 1)
+    self.assertLessEqual(
+        tf.math.reduce_max(tf.math.reduce_sum(state.link, axis=3)), 1)
 
     # records our transitions in batch 0: head 0: 0->1, and head 1: 3->2
     self.assertAllEqual(state.link[0, 0, :, 0], util.one_hot(memory_size, 1))
@@ -216,16 +192,12 @@ class TemporalLinkageTest(tf.test.TestCase):
     prev_read_weights[0, 6, :] = util.one_hot(memory_size, 2)  # read 6, posn 2
     forward_read_weights = module.directional_read_weights(
         tf.constant(state.link),
-        tf.constant(prev_read_weights, dtype=tf.float32),
+        tf.constant(prev_read_weights, dtype=tf.float64),
         forward=True)
     backward_read_weights = module.directional_read_weights(
         tf.constant(state.link),
-        tf.constant(prev_read_weights, dtype=tf.float32),
+        tf.constant(prev_read_weights, dtype=tf.float64),
         forward=False)
-
-    with self.test_session():
-      forward_read_weights = forward_read_weights.eval()
-      backward_read_weights = backward_read_weights.eval()
 
     # Check directional weights calculated correctly.
     self.assertAllEqual(
@@ -257,12 +229,9 @@ class TemporalLinkageTest(tf.test.TestCase):
         prev_precedence_weights=tf.constant(prev_precedence_weights),
         write_weights=tf.constant(write_weights))
 
-    with self.test_session():
-      precedence_weights = precedence_weights.eval()
-
     # precedence weights should be bounded in range [0, 1]
-    self.assertGreaterEqual(precedence_weights.min(), 0)
-    self.assertLessEqual(precedence_weights.max(), 1)
+    self.assertGreaterEqual(tf.math.reduce_min(precedence_weights), 0)
+    self.assertLessEqual(tf.math.reduce_max(precedence_weights), 1)
 
     # no writing in batch 0, head 1
     self.assertAllClose(precedence_weights[0, 1, :],
@@ -300,8 +269,8 @@ class FreenessTest(tf.test.TestCase):
         tf.constant(prev_write_weights),
         tf.constant(free_gate),
         tf.constant(prev_read_weights), tf.constant(prev_usage))
-    with self.test_session():
-      usage = usage.eval()
+
+    usage = usage.numpy()
 
     # Check all usages are between 0 and 1.
     self.assertGreaterEqual(usage.min(), 0)
@@ -345,8 +314,7 @@ class FreenessTest(tf.test.TestCase):
         write_gates=tf.constant(write_gates),
         num_writes=num_writes)
 
-    with self.test_session():
-      weights = weights.eval()
+    weights = weights.numpy()
 
     # Check that all weights are between 0 and 1
     self.assertGreaterEqual(weights.min(), 0)
@@ -373,16 +341,17 @@ class FreenessTest(tf.test.TestCase):
 
     usage = tf.constant(np.random.rand(batch_size, memory_size))
     write_gates = tf.constant(np.random.rand(batch_size, num_writes))
-    weights = module.write_allocation_weights(usage, write_gates, num_writes)
+    #weights = module.write_allocation_weights(usage, write_gates, num_writes)
 
-    with self.test_session():
-      err = tf.compat.v1.test.compute_gradient_error(
-          [usage, write_gates],
-          [usage.get_shape().as_list(), write_gates.get_shape().as_list()],
-          weights,
-          weights.get_shape().as_list(),
-          delta=1e-5)
-      self.assertLess(err, 0.01)
+    theoretical, numerical = tf.test.compute_gradient(
+        lambda usage, write_gates: module.write_allocation_weights(usage, write_gates, num_writes),
+        [usage, write_gates],
+        delta=1e-5
+    )
+    self.assertLess(
+        sum([tf.norm(numerical[i] - theoretical[i]) for i in range(2)]),
+        0.01
+    )
 
   def testAllocation(self):
     batch_size = 7
@@ -390,8 +359,6 @@ class FreenessTest(tf.test.TestCase):
     usage = np.random.rand(batch_size, memory_size)
     module = addressing.Freeness(memory_size)
     allocation = module._allocation(tf.constant(usage))
-    with self.test_session():
-      allocation = allocation.eval()
 
     # 1. Test that max allocation goes to min usage, and vice versa.
     self.assertAllEqual(np.argmin(usage, axis=1), np.argmax(allocation, axis=1))
@@ -406,15 +373,15 @@ class FreenessTest(tf.test.TestCase):
     usage = tf.constant(np.random.rand(batch_size, memory_size))
     module = addressing.Freeness(memory_size)
     allocation = module._allocation(usage)
-    with self.test_session():
-      err = tf.compat.v1.test.compute_gradient_error(
-          usage,
-          usage.get_shape().as_list(),
-          allocation,
-          allocation.get_shape().as_list(),
-          delta=1e-5)
-      self.assertLess(err, 0.01)
-
+    theoretical, numerical = tf.test.compute_gradient(
+        module._allocation,
+        [usage],
+        delta=1e-5
+    )
+    self.assertLess(
+        sum([tf.norm(numerical[i] - theoretical[i]) for i in range(1)]),
+        0.01
+    )
 
 if __name__ == '__main__':
   tf.test.main()
