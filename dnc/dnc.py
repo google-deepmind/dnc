@@ -78,6 +78,9 @@ class DNC(snt.RNNCore):
         access_state=self._access.state_size,
         controller_state=util.state_size_from_initial_state(
             self._controller.initial_state(batch_size)))
+    self._output_linear = snt.Linear(
+        output_size=self._output_size.as_list()[0],
+        name='output_linear')
 
   def _clip_if_enabled(self, x):
     if self._clip_value > 0:
@@ -123,9 +126,7 @@ class DNC(snt.RNNCore):
                                                prev_access_state)
 
     output = tf.concat([controller_output, batch_flatten(access_output)], 1)
-    output = snt.Linear(
-        output_size=self._output_size.as_list()[0],
-        name='output_linear')(output)
+    output = self._output_linear(output)
     output = self._clip_if_enabled(output)
 
     return output, DNCState(

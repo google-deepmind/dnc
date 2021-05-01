@@ -22,7 +22,7 @@ import numpy as np
 import sonnet as snt
 import tensorflow as tf
 
-import addressing, util
+from dnc import addressing, util
 
 
 class WeightedSoftmaxTest(tf.test.TestCase):
@@ -382,6 +382,3 @@ class FreenessTest(tf.test.TestCase):
         sum([tf.norm(numerical[i] - theoretical[i]) for i in range(1)]),
         0.01
     )
-
-if __name__ == '__main__':
-  tf.test.main()

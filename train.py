@@ -18,65 +18,85 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import tensorflow.compat.v1 as tf
+import tensorflow.compat.v1 as tf1
+import tensorflow as tf
 import sonnet as snt
+import datetime
 
 from dnc import dnc
 from dnc import repeat_copy
 
-FLAGS = tf.flags.FLAGS
+FLAGS = tf1.flags.FLAGS
 
 # Model parameters
-tf.flags.DEFINE_integer("hidden_size", 64, "Size of LSTM hidden layer.")
-tf.flags.DEFINE_integer("memory_size", 16, "The number of memory slots.")
-tf.flags.DEFINE_integer("word_size", 16, "The width of each memory slot.")
-tf.flags.DEFINE_integer("num_write_heads", 1, "Number of memory write heads.")
-tf.flags.DEFINE_integer("num_read_heads", 4, "Number of memory read heads.")
-tf.flags.DEFINE_integer("clip_value", 20,
+tf1.flags.DEFINE_integer("hidden_size", 64, "Size of LSTM hidden layer.")
+tf1.flags.DEFINE_integer("memory_size", 16, "The number of memory slots.")
+tf1.flags.DEFINE_integer("word_size", 16, "The width of each memory slot.")
+tf1.flags.DEFINE_integer("num_write_heads", 1, "Number of memory write heads.")
+tf1.flags.DEFINE_integer("num_read_heads", 4, "Number of memory read heads.")
+tf1.flags.DEFINE_integer("clip_value", 20,
                         "Maximum absolute value of controller and dnc outputs.")
 
 # Optimizer parameters.
-tf.flags.DEFINE_float("max_grad_norm", 50, "Gradient clipping norm limit.")
-tf.flags.DEFINE_float("learning_rate", 1e-4, "Optimizer learning rate.")
-tf.flags.DEFINE_float("optimizer_epsilon", 1e-10,
+tf1.flags.DEFINE_float("max_grad_norm", 50, "Gradient clipping norm limit.")
+tf1.flags.DEFINE_float("learning_rate", 1e-4, "Optimizer learning rate.")
+tf1.flags.DEFINE_float("optimizer_epsilon", 1e-10,
                       "Epsilon used for RMSProp optimizer.")
 
 # Task parameters
-tf.flags.DEFINE_integer("batch_size", 16, "Batch size for training.")
-tf.flags.DEFINE_integer("num_bits", 4, "Dimensionality of each vector to copy")
-tf.flags.DEFINE_integer(
+tf1.flags.DEFINE_integer("batch_size", 16, "Batch size for training.")
+tf1.flags.DEFINE_integer("num_bits", 4, "Dimensionality of each vector to copy")
+tf1.flags.DEFINE_integer(
     "min_length", 1,
     "Lower limit on number of vectors in the observation pattern to copy")
-tf.flags.DEFINE_integer(
+tf1.flags.DEFINE_integer(
     "max_length", 2,
     "Upper limit on number of vectors in the observation pattern to copy")
-tf.flags.DEFINE_integer("min_repeats", 1,
+tf1.flags.DEFINE_integer("min_repeats", 1,
                         "Lower limit on number of copy repeats.")
-tf.flags.DEFINE_integer("max_repeats", 2,
+tf1.flags.DEFINE_integer("max_repeats", 2,
                         "Upper limit on number of copy repeats.")
 
 # Training options.
-tf.flags.DEFINE_integer("num_training_iterations", 100000,
+tf1.flags.DEFINE_integer("num_training_iterations", 10000,
                         "Number of iterations to train for.")
-tf.flags.DEFINE_integer("report_interval", 100,
+tf1.flags.DEFINE_integer("report_interval", 100,
                         "Iterations between reports (samples, valid loss).")
-tf.flags.DEFINE_string("checkpoint_dir", "/tmp/tf/dnc",
+tf1.flags.DEFINE_string("checkpoint_dir", "./logs/dnc/checkpoint",
                        "Checkpointing directory.")
-tf.flags.DEFINE_integer("checkpoint_interval", -1,
+tf1.flags.DEFINE_integer("checkpoint_interval", 2000,
                         "Checkpointing step interval.")
 
 @tf.function
-def run_model(input_sequence, rnn_model):
+def train_step(x, y, rnn_model, loss, optimizer):
   """Runs model on input sequence."""
   initial_state = rnn_model.get_initial_state()
-  import ipdb; ipdb.set_trace()
-  output_sequence, _ = tf.nn.dynamic_rnn(
-      cell=rnn_model,
-      inputs=input_sequence,
-      time_major=True,
-      initial_state=initial_state)
+  with tf.GradientTape() as tape:
+    output_sequence, _ = tf.compat.v1.nn.dynamic_rnn(
+        cell=rnn_model,
+        inputs=x,
+        time_major=True,
+        initial_state=initial_state)
+    loss_value = loss(output_sequence, y)
+  grads = tape.gradient(loss_value, rnn_model.trainable_variables)
+  grads, _ = tf.clip_by_global_norm(grads, FLAGS.max_grad_norm)
+  optimizer.apply_gradients(zip(grads, rnn_model.trainable_variables))
 
-  return output_sequence
+  return loss_value
+
+@tf.function
+def test_step(x, y, rnn_model, loss, mask):
+  initial_state = rnn_model.get_initial_state()
+  output_sequence, _ = tf.compat.v1.nn.dynamic_rnn(
+    cell=rnn_model,
+    inputs=x,
+    time_major=True,
+    initial_state=initial_state)
+  loss_value = loss(output_sequence, y)
+  # Used for visualization.
+  output = tf.round(
+    tf.expand_dims(mask, -1) * tf.sigmoid(output_sequence))
+  return loss_value, output
 
 
 def train(num_training_iterations, report_interval):
@@ -101,81 +121,71 @@ def train(num_training_iterations, report_interval):
 
   dnc_core = dnc.DNC(
     access_config, controller_config, dataset.target_size, FLAGS.batch_size, clip_value)
-
-  import ipdb; ipdb.set_trace()
-  # Set up logging.
-  from datetime import datetime
-  import tensorflow as tf2
-  stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-  logdir = 'logs/func/%s' % stamp
-  writer = tf2.summary.create_file_writer(logdir)
-
-  tf2.summary.trace_on(graph=True, profiler=True)
-  output_logits = run_model(dataset_tensors.observations, dnc_core)
-  with writer.as_default():
-      tf2.summary.trace_export(
-          name="my_func_trace",
-          step=0,
-          profiler_outdir=logdir)
-
-  # Used for visualization.
-  output = tf.round(
-      tf.expand_dims(dataset_tensors.mask, -1) * tf.sigmoid(output_logits))
-
-  train_loss = dataset.cost(output_logits, dataset_tensors.target,
-                            dataset_tensors.mask)
-
-  # Set up optimizer with global norm clipping.
-  trainable_variables = dnc_core.trainable_variables
-  import ipdb; ipdb.set_trace()
-  with tf.GradientTape() as gtape:
-      grads = gtape.gradient(train_loss, trainable_variables)
-      grads, _ = tf.clip_by_global_norm(grads, FLAGS.max_grad_norm)
-
-  global_step = tf.compat.v1.get_variable(
-      name="global_step",
-      shape=[],
-      dtype=tf.int64,
-      initializer=tf.compat.v1.zeros_initializer(),
-      trainable=False,
-      collections=[tf.compat.v1.GraphKeys.GLOBAL_VARIABLES, tf.compat.v1.GraphKeys.GLOBAL_STEP])
-
+  loss_fn = lambda pred, target: dataset.cost(
+    pred, target, dataset_tensors.mask)
   optimizer = tf.compat.v1.train.RMSPropOptimizer(
       FLAGS.learning_rate, epsilon=FLAGS.optimizer_epsilon)
-  train_step = optimizer.apply_gradients(
-      zip(grads, trainable_variables), global_step=global_step)
 
-  saver = tf.compat.v1.train.Saver()
+  #saver = tf.train.Checkpoint()
 
-  if FLAGS.checkpoint_interval > 0:
-    hooks = [
-        tf.estimator.CheckpointSaverHook(
-            checkpoint_dir=FLAGS.checkpoint_dir,
-            save_steps=FLAGS.checkpoint_interval,
-            saver=saver)
-    ]
-  else:
-    hooks = []
+  # Set up logging and metrics
+  train_loss = tf.keras.metrics.Mean('train_loss', dtype=tf.float32)
+  test_loss = tf.keras.metrics.Mean('test_loss', dtype=tf.float32)
+
+  current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+  train_log_dir = 'logs/dnc/' + current_time + '/train'
+  test_log_dir = 'logs/dnc/' + current_time + '/test'
+  train_summary_writer = tf.summary.create_file_writer(train_log_dir)
+  test_summary_writer = tf.summary.create_file_writer(test_log_dir)
+
+  # Test once to initialize
+  graph_log_dir = 'logs/dnc/' + current_time + '/graph'
+  graph_writer = tf.summary.create_file_writer(graph_log_dir)
+  with graph_writer.as_default():
+    tf.summary.trace_on(graph=True, profiler=True)
+    test_step(
+      dataset_tensors.observations, dataset_tensors.target, dnc_core, loss_fn, dataset_tensors.mask
+    )
+    tf.summary.trace_export(
+      name="dnc_trace",
+      step=0,
+      profiler_outdir=graph_log_dir)
+  return
+
+  # Set up model checkpointing
+  checkpoint = tf.train.Checkpoint(model=dnc_core, optimizer=optimizer)
 
   # Train.
-  with tf.compat.v1.train.SingularMonitoredSession(
-      hooks=hooks, checkpoint_dir=FLAGS.checkpoint_dir) as sess:
+  for epoch in range(0, num_training_iterations):
+    loss_value = train_step(
+      dataset_tensors.observations, dataset_tensors.target, dnc_core, loss_fn, optimizer,
+    )
+    train_loss(loss_value)
+    with train_summary_writer.as_default():
+      tf.summary.scalar('loss', train_loss.result(), step=epoch)
 
-    start_iteration = sess.run(global_step)
-    total_loss = 0
+    if (epoch) % report_interval == 0:
+      loss_value, output = test_step(
+        dataset_tensors.observations, dataset_tensors.target, dnc_core, loss_fn, dataset_tensors.mask
+      )
+      test_loss(loss_value)
+      #dataset_string = dataset.to_human_readable(dataset_tensors_np,output_np)
+      with test_summary_writer.as_default():
+        tf.summary.scalar('loss', test_loss.result(), step=epoch)
 
-    for train_iteration in range(start_iteration, num_training_iterations):
-      _, loss = sess.run([train_step, train_loss])
-      total_loss += loss
+      template = 'Epoch {}, Loss: {}, Test Loss: {}'
+      print(template.format(
+        epoch + 1,
+        train_loss.result(),
+        test_loss.result(),
+      ))
 
-      if (train_iteration + 1) % report_interval == 0:
-        dataset_tensors_np, output_np = sess.run([dataset_tensors, output])
-        dataset_string = dataset.to_human_readable(dataset_tensors_np,
-                                                   output_np)
-        tf.compat.v1.logging.info("%d: Avg training loss %f.\n%s",
-                        train_iteration, total_loss / report_interval,
-                        dataset_string)
-        total_loss = 0
+      # reset metrics every epoch
+      train_loss.reset_states()
+      test_loss.reset_states()
+
+    if (epoch) % FLAGS.checkpoint_interval == 0:
+      checkpoint.save(FLAGS.checkpoint_dir)
 
 
 def main(unused_argv):

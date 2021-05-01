@@ -21,7 +21,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 
-import util
+from dnc import util
 
 
 class BatchInvertPermutation(tf.test.TestCase):
@@ -53,7 +53,3 @@ class BatchGather(tf.test.TestCase):
     result = util.batch_gather(tf.constant(values), tf.constant(indexs))
     result = result.numpy()
     self.assertAllEqual(target, result)
-
-
-if __name__ == '__main__':
-  tf.test.main()

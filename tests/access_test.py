@@ -167,7 +167,3 @@ class MemoryAccessTest(tf.test.TestCase):
         sum([tf.norm(numerical[i] - theoretical[i]) for i in range(2)]),
         0.01
     )
-
-
-if __name__ == '__main__':
-  tf.test.main()
