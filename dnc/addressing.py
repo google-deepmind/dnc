@@ -81,9 +81,6 @@ class CosineWeights(snt.Module):
     self._strength_op = strength_op
 
   def __call__(self, memory, keys, strengths):
-      return self._build(memory, keys, strengths)
-
-  def _build(self, memory, keys, strengths):
     """Connects the CosineWeights module into the graph.
 
     Args:
@@ -135,9 +132,6 @@ class TemporalLinkage(snt.RNNCore):
     self._dtype = dtype
 
   def __call__(self, write_weights, prev_state):
-      return self._build(write_weights, prev_state)
-
-  def _build(self, write_weights, prev_state):
     """Calculate the updated linkage state given the write weights.
 
     Args:
@@ -177,15 +171,14 @@ class TemporalLinkage(snt.RNNCore):
     Returns:
       tensor of shape `[batch_size, num_reads, num_writes, memory_size]`
     """
-    with tf.compat.v1.name_scope('directional_read_weights'):
-      # We calculate the forward and backward directions for each pair of
-      # read and write heads; hence we need to tile the read weights and do a
-      # sort of "outer product" to get this.
-      expanded_read_weights = tf.stack([prev_read_weights] * self._num_writes,
-                                       1)
-      result = tf.matmul(expanded_read_weights, link, adjoint_b=forward)
-      # Swap dimensions 1, 2 so order is [batch, reads, writes, memory]:
-      return tf.transpose(a=result, perm=[0, 2, 1, 3])
+    # We calculate the forward and backward directions for each pair of
+    # read and write heads; hence we need to tile the read weights and do a
+    # sort of "outer product" to get this.
+    expanded_read_weights = tf.stack([prev_read_weights] * self._num_writes,
+                                     1)
+    result = tf.matmul(expanded_read_weights, link, adjoint_b=forward)
+    # Swap dimensions 1, 2 so order is [batch, reads, writes, memory]:
+    return tf.transpose(a=result, perm=[0, 2, 1, 3])
 
   def _link(self, prev_link, prev_precedence_weights, write_weights):
     """Calculates the new link graphs.
@@ -208,21 +201,20 @@ class TemporalLinkage(snt.RNNCore):
       A tensor of shape `[batch_size, num_writes, memory_size, memory_size]`
       containing the new link graphs for each write head.
     """
-    with tf.compat.v1.name_scope('link'):
-      batch_size = tf.shape(input=prev_link)[0]
-      write_weights_i = tf.expand_dims(write_weights, 3)
-      write_weights_j = tf.expand_dims(write_weights, 2)
-      prev_precedence_weights_j = tf.expand_dims(prev_precedence_weights, 2)
-      prev_link_scale = 1 - write_weights_i - write_weights_j
-      new_link = write_weights_i * prev_precedence_weights_j
-      link = prev_link_scale * prev_link + new_link
-      # Return the link with the diagonal set to zero, to remove self-looping
-      # edges.
-      return tf.linalg.set_diag(
-          link,
-          tf.zeros(
-              [batch_size, self._num_writes, self._memory_size],
-              dtype=link.dtype))
+    batch_size = tf.shape(input=prev_link)[0]
+    write_weights_i = tf.expand_dims(write_weights, 3)
+    write_weights_j = tf.expand_dims(write_weights, 2)
+    prev_precedence_weights_j = tf.expand_dims(prev_precedence_weights, 2)
+    prev_link_scale = 1 - write_weights_i - write_weights_j
+    new_link = write_weights_i * prev_precedence_weights_j
+    link = prev_link_scale * prev_link + new_link
+    # Return the link with the diagonal set to zero, to remove self-looping
+    # edges.
+    return tf.linalg.set_diag(
+        link,
+        tf.zeros(
+            [batch_size, self._num_writes, self._memory_size],
+            dtype=link.dtype))
 
   def _precedence_weights(self, prev_precedence_weights, write_weights):
     """Calculates the new precedence weights given the current write weights.
@@ -242,12 +234,11 @@ class TemporalLinkage(snt.RNNCore):
       A tensor of shape `[batch_size, num_writes, memory_size]` containing the
       new precedence weights.
     """
-    with tf.compat.v1.name_scope('precedence_weights'):
-      write_sum = tf.reduce_sum(input_tensor=write_weights, axis=2, keepdims=True)
-      return (1 - write_sum) * prev_precedence_weights + write_weights
+    write_sum = tf.reduce_sum(input_tensor=write_weights, axis=2, keepdims=True)
+    return (1 - write_sum) * prev_precedence_weights + write_weights
 
   def initial_state(self, batch_size):
-      return util.initial_state_from_state_size(self.state_size, batch_size, self._dtype)
+    return util.initial_state_from_state_size(self.state_size, batch_size, self._dtype)
 
 
   @property
@@ -289,9 +280,6 @@ class Freeness(snt.RNNCore):
     self._dtype = dtype
 
   def __call__(self, write_weights, free_gate, read_weights, prev_usage):
-      return self._build(write_weights, free_gate, read_weights, prev_usage)
-
-  def _build(self, write_weights, free_gate, read_weights, prev_usage):
     """Calculates the new memory usage u_t.
 
     Memory that was written to in the previous time step will have its usage
@@ -341,21 +329,20 @@ class Freeness(snt.RNNCore):
           freeness-based write locations. Note that this isn't scaled by
           `write_gate`; this scaling must be applied externally.
     """
-    with tf.compat.v1.name_scope('write_allocation_weights'):
-      # expand gatings over memory locations
-      write_gates = tf.expand_dims(write_gates, -1)
+    # expand gatings over memory locations
+    write_gates = tf.expand_dims(write_gates, -1)
 
-      allocation_weights = []
-      for i in range(num_writes):
-        allocation_weights.append(self._allocation(usage))
-        # update usage to take into account writing to this new allocation
-        usage += ((1 - usage) * write_gates[:, i, :] * allocation_weights[i])
+    allocation_weights = []
+    for i in range(num_writes):
+      allocation_weights.append(self._allocation(usage))
+      # update usage to take into account writing to this new allocation
+      usage += ((1 - usage) * write_gates[:, i, :] * allocation_weights[i])
 
-      # Pack the allocation weights for the write heads into one tensor.
-      return tf.stack(allocation_weights, axis=1)
+    # Pack the allocation weights for the write heads into one tensor.
+    return tf.stack(allocation_weights, axis=1)
 
   def _usage_after_write(self, prev_usage, write_weights):
-    """Calcualtes the new usage after writing to memory.
+    """Calculates the new usage after writing to memory.
 
     Args:
       prev_usage: tensor of shape `[batch_size, memory_size]`.
@@ -364,10 +351,9 @@ class Freeness(snt.RNNCore):
     Returns:
       New usage, a tensor of shape `[batch_size, memory_size]`.
     """
-    with tf.compat.v1.name_scope('usage_after_write'):
-      # Calculate the aggregated effect of all write heads
-      write_weights = 1 - util.reduce_prod(1 - write_weights, 1)
-      return prev_usage + (1 - prev_usage) * write_weights
+    # Calculate the aggregated effect of all write heads
+    write_weights = 1 - util.reduce_prod(1 - write_weights, 1)
+    return prev_usage + (1 - prev_usage) * write_weights
 
   def _usage_after_read(self, prev_usage, free_gate, read_weights):
     """Calcualtes the new usage after reading and freeing from memory.
@@ -382,11 +368,10 @@ class Freeness(snt.RNNCore):
     Returns:
       New usage, a tensor of shape `[batch_size, memory_size]`.
     """
-    with tf.compat.v1.name_scope('usage_after_read'):
-      free_gate = tf.expand_dims(free_gate, -1)
-      free_read_weights = free_gate * read_weights
-      phi = util.reduce_prod(1 - free_read_weights, 1, name='phi')
-      return prev_usage * phi
+    free_gate = tf.expand_dims(free_gate, -1)
+    free_read_weights = free_gate * read_weights
+    phi = util.reduce_prod(1 - free_read_weights, 1, name='phi')
+    return prev_usage * phi
 
   def _allocation(self, usage):
     r"""Computes allocation by sorting `usage`.
@@ -403,28 +388,27 @@ class Freeness(snt.RNNCore):
     Returns:
       Tensor of shape `[batch_size, memory_size]` corresponding to allocation.
     """
-    with tf.compat.v1.name_scope('allocation'):
-      # Ensure values are not too small prior to cumprod.
-      usage = _EPSILON + (1 - _EPSILON) * usage
+    # Ensure values are not too small prior to cumprod.
+    usage = _EPSILON + (1 - _EPSILON) * usage
 
-      nonusage = 1 - usage
-      sorted_nonusage, indices = tf.nn.top_k(
-          nonusage, k=self._memory_size, name='sort')
-      sorted_usage = 1 - sorted_nonusage
-      prod_sorted_usage = tf.math.cumprod(sorted_usage, axis=1, exclusive=True)
-      sorted_allocation = sorted_nonusage * prod_sorted_usage
-      inverse_indices = tf.cast(
-        util.batch_invert_permutation(indices),
-        tf.int32
-      )
+    nonusage = 1 - usage
+    sorted_nonusage, indices = tf.nn.top_k(
+        nonusage, k=self._memory_size, name='sort')
+    sorted_usage = 1 - sorted_nonusage
+    prod_sorted_usage = tf.math.cumprod(sorted_usage, axis=1, exclusive=True)
+    sorted_allocation = sorted_nonusage * prod_sorted_usage
+    inverse_indices = tf.cast(
+      util.batch_invert_permutation(indices),
+      tf.int32
+    )
 
-      # This final line "unsorts" sorted_allocation, so that the indexing
-      # corresponds to the original indexing of `usage`.
-      return util.batch_gather(sorted_allocation, inverse_indices)
+    # This final line "unsorts" sorted_allocation, so that the indexing
+    # corresponds to the original indexing of `usage`.
+    return util.batch_gather(sorted_allocation, inverse_indices)
 
   # freeness size is independent of batch size
   def initial_state(self, batch_size):
-    return util.initial_state_from_state_size(self.state_size, batch_size, self._dtype)
+    return tf.zeros([self._memory_size], dtype=self._dtype)
 
   @property
   def state_size(self):

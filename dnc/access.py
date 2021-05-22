@@ -48,16 +48,14 @@ def _erase_and_write(memory, address, reset_weights, values):
   Returns:
     3-D tensor of shape `[batch_size, num_writes, word_size]`.
   """
-  with tf.compat.v1.name_scope('erase_memory', values=[memory, address, reset_weights]):
-    expand_address = tf.expand_dims(address, 3)
-    reset_weights = tf.expand_dims(reset_weights, 2)
-    weighted_resets = expand_address * reset_weights
-    reset_gate = util.reduce_prod(1 - weighted_resets, 1)
-    memory *= reset_gate
+  expand_address = tf.expand_dims(address, 3)
+  reset_weights = tf.expand_dims(reset_weights, 2)
+  weighted_resets = expand_address * reset_weights
+  reset_gate = util.reduce_prod(1 - weighted_resets, 1)
+  memory *= reset_gate
 
-  with tf.compat.v1.name_scope('additive_write', values=[memory, address, values]):
-    add_matrix = tf.matmul(address, values, adjoint_a=True)
-    memory += add_matrix
+  add_matrix = tf.matmul(address, values, adjoint_a=True)
+  memory += add_matrix
 
   return memory
 
@@ -271,24 +269,23 @@ class MemoryAccess(snt.RNNCore):
       tensor of shape `[batch_size, num_writes, memory_size]` indicating where
           to write to (if anywhere) for each write head.
     """
-    with tf.compat.v1.name_scope('write_weights', values=[inputs, memory, usage]):
-      # c_t^{w, i} - The content-based weights for each write head.
-      write_content_weights = self._write_content_weights_mod(
-          memory, inputs['write_content_keys'],
-          inputs['write_content_strengths'])
+    # c_t^{w, i} - The content-based weights for each write head.
+    write_content_weights = self._write_content_weights_mod(
+        memory, inputs['write_content_keys'],
+        inputs['write_content_strengths'])
 
-      # a_t^i - The allocation weights for each write head.
-      write_allocation_weights = self._freeness.write_allocation_weights(
-          usage=usage,
-          write_gates=(inputs['allocation_gate'] * inputs['write_gate']),
-          num_writes=self._num_writes)
+    # a_t^i - The allocation weights for each write head.
+    write_allocation_weights = self._freeness.write_allocation_weights(
+        usage=usage,
+        write_gates=(inputs['allocation_gate'] * inputs['write_gate']),
+        num_writes=self._num_writes)
 
-      # Expands gates over memory locations.
-      allocation_gate = tf.expand_dims(inputs['allocation_gate'], -1)
-      write_gate = tf.expand_dims(inputs['write_gate'], -1)
+    # Expands gates over memory locations.
+    allocation_gate = tf.expand_dims(inputs['allocation_gate'], -1)
+    write_gate = tf.expand_dims(inputs['write_gate'], -1)
 
-      # w_t^{w, i} - The write weightings for each write head.
-      return write_gate * (allocation_gate * write_allocation_weights +
+    # w_t^{w, i} - The write weightings for each write head.
+    return write_gate * (allocation_gate * write_allocation_weights +
                            (1 - allocation_gate) * write_content_weights)
 
   def _read_weights(self, inputs, memory, prev_read_weights, link):
@@ -313,29 +310,27 @@ class MemoryAccess(snt.RNNCore):
       A tensor of shape `[batch_size, num_reads, memory_size]` containing the
       read weights for each read head.
     """
-    with tf.compat.v1.name_scope(
-        'read_weights', values=[inputs, memory, prev_read_weights, link]):
-      # c_t^{r, i} - The content weightings for each read head.
-      content_weights = self._read_content_weights_mod(
-          memory, inputs['read_content_keys'], inputs['read_content_strengths'])
+    # c_t^{r, i} - The content weightings for each read head.
+    content_weights = self._read_content_weights_mod(
+        memory, inputs['read_content_keys'], inputs['read_content_strengths'])
 
-      # Calculates f_t^i and b_t^i.
-      forward_weights = self._linkage.directional_read_weights(
-          link, prev_read_weights, forward=True)
-      backward_weights = self._linkage.directional_read_weights(
-          link, prev_read_weights, forward=False)
+    # Calculates f_t^i and b_t^i.
+    forward_weights = self._linkage.directional_read_weights(
+        link, prev_read_weights, forward=True)
+    backward_weights = self._linkage.directional_read_weights(
+        link, prev_read_weights, forward=False)
 
-      backward_mode = inputs['read_mode'][:, :, :self._num_writes]
-      forward_mode = (
-          inputs['read_mode'][:, :, self._num_writes:2 * self._num_writes])
-      content_mode = inputs['read_mode'][:, :, 2 * self._num_writes]
+    backward_mode = inputs['read_mode'][:, :, :self._num_writes]
+    forward_mode = (
+        inputs['read_mode'][:, :, self._num_writes:2 * self._num_writes])
+    content_mode = inputs['read_mode'][:, :, 2 * self._num_writes]
 
-      read_weights = (
-          tf.expand_dims(content_mode, 2) * content_weights + tf.reduce_sum(
-              input_tensor=tf.expand_dims(forward_mode, 3) * forward_weights, axis=2) +
-          tf.reduce_sum(input_tensor=tf.expand_dims(backward_mode, 3) * backward_weights, axis=2))
+    read_weights = (
+        tf.expand_dims(content_mode, 2) * content_weights + tf.reduce_sum(
+            input_tensor=tf.expand_dims(forward_mode, 3) * forward_weights, axis=2) +
+        tf.reduce_sum(input_tensor=tf.expand_dims(backward_mode, 3) * backward_weights, axis=2))
 
-      return read_weights
+    return read_weights
 
   def initial_state(self, batch_size):
     return util.initial_state_from_state_size(self.state_size, batch_size, self._dtype)

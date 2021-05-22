@@ -24,32 +24,30 @@ import tensorflow as tf
 
 def batch_invert_permutation(permutations):
   """Returns batched `tf.invert_permutation` for every row in `permutations`."""
-  with tf.compat.v1.name_scope('batch_invert_permutation', values=[permutations]):
-    perm = tf.cast(permutations, tf.float32)
-    dim = int(perm.get_shape()[-1])
-    size = tf.cast(tf.shape(input=perm)[0], tf.float32)
-    delta = tf.cast(tf.shape(input=perm)[-1], tf.float32)
-    rg = tf.range(0, size * delta, delta, dtype=tf.float32)
-    rg = tf.expand_dims(rg, 1)
-    rg = tf.tile(rg, [1, dim])
-    perm = tf.add(perm, rg)
-    flat = tf.reshape(perm, [-1])
-    perm = tf.math.invert_permutation(tf.cast(flat, tf.int32))
-    perm = tf.reshape(perm, [-1, dim])
-    return tf.subtract(perm, tf.cast(rg, tf.int32))
+  perm = tf.cast(permutations, tf.float32)
+  dim = int(perm.get_shape()[-1])
+  size = tf.cast(tf.shape(input=perm)[0], tf.float32)
+  delta = tf.cast(tf.shape(input=perm)[-1], tf.float32)
+  rg = tf.range(0, size * delta, delta, dtype=tf.float32)
+  rg = tf.expand_dims(rg, 1)
+  rg = tf.tile(rg, [1, dim])
+  perm = tf.add(perm, rg)
+  flat = tf.reshape(perm, [-1])
+  perm = tf.math.invert_permutation(tf.cast(flat, tf.int32))
+  perm = tf.reshape(perm, [-1, dim])
+  return tf.subtract(perm, tf.cast(rg, tf.int32))
 
 
 def batch_gather(values, indices):
   """Returns batched `tf.gather` for every row in the input."""
-  with tf.compat.v1.name_scope('batch_gather', values=[values, indices]):
-    idx = tf.expand_dims(tf.cast(indices, tf.int32), -1)
-    size = tf.shape(input=indices)[0]
-    rg = tf.range(tf.cast(size, tf.int32), dtype=tf.int32)
-    rg = tf.expand_dims(rg, -1)
-    rg = tf.tile(rg, [1, int(indices.get_shape()[-1])])
-    rg = tf.expand_dims(rg, -1)
-    gidx = tf.concat([rg, idx], -1)
-    return tf.gather_nd(values, gidx)
+  idx = tf.expand_dims(tf.cast(indices, tf.int32), -1)
+  size = tf.shape(input=indices)[0]
+  rg = tf.range(tf.cast(size, tf.int32), dtype=tf.int32)
+  rg = tf.expand_dims(rg, -1)
+  rg = tf.tile(rg, [1, int(indices.get_shape()[-1])])
+  rg = tf.expand_dims(rg, -1)
+  gidx = tf.concat([rg, idx], -1)
+  return tf.gather_nd(values, gidx)
 
 
 def one_hot(length, index):
