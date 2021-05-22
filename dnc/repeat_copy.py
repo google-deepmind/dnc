@@ -185,7 +185,7 @@ class RepeatCopy(snt.Module):
       log_prob_in_bits=False,
       time_average_cost=False,
       name='repeat_copy',
-      dtype=tf.float64):
+      dtype=tf.float32):
     """Creates an instance of RepeatCopy task.
 
     Args:
@@ -252,10 +252,9 @@ class RepeatCopy(snt.Module):
     return self._batch_size
 
   def __call__(self):
-    self._build()
-    return self.datasettensor
+    return self._build()
+    #return self.datasettensor
 
-  @snt.once
   def _build(self):
     """Implements build method which adds ops to graph."""
 
@@ -381,7 +380,7 @@ class RepeatCopy(snt.Module):
     targ = tf.cast(tf.reshape(tf.concat(targ_tensors, 1), targ_batch_shape), dtype=self._dtype)
     mask = tf.cast(tf.transpose(
         a=tf.reshape(tf.concat(mask_tensors, 0), mask_batch_trans_shape)), dtype=self._dtype)
-    self.datasettensor = DatasetTensors(obs, targ, mask)
+    return DatasetTensors(obs, targ, mask)
 
   def cost(self, logits, targ, mask):
     return masked_sigmoid_cross_entropy(
@@ -392,6 +391,11 @@ class RepeatCopy(snt.Module):
         log_prob_in_bits=self.log_prob_in_bits)
 
   def to_human_readable(self, data, model_output=None, whole_batch=False):
+    data = DatasetTensors(
+      observations=data.observations.numpy(),
+      target=data.target.numpy(),
+      mask=data.mask.numpy()
+    )
     obs = data.observations
     unnormalised_num_reps_flag = self._unnormalise(obs[:,:,-1:]).round()
     obs = np.concatenate([obs[:,:,:-1], unnormalised_num_reps_flag], axis=2)

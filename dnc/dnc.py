@@ -45,7 +45,8 @@ class DNC(snt.RNNCore):
                output_size,
                batch_size,
                clip_value=None,
-               name='dnc'):
+               name='dnc',
+               dtype=tf.float32):
     """Initializes the DNC core.
 
     Args:
@@ -62,10 +63,13 @@ class DNC(snt.RNNCore):
     """
     super(DNC, self).__init__(name=name)
 
+    self._dtype = dtype
+
     #with self._enter_variable_scope():
     #with tf.variable_scope(name):
-    self._controller = snt.LSTM(**controller_config, dtype=tf.float64)
-    self._access = access.MemoryAccess(**access_config)
+    #self._controller = snt.LSTM(**controller_config, dtype=tf.float64)
+    self._controller = tf.keras.layers.LSTMCell(**controller_config, dtype=dtype)
+    self._access = access.MemoryAccess(**access_config, dtype=dtype)
 
     self._access_output_size = np.prod(self._access.output_size.as_list())
     self._output_size = output_size
@@ -76,8 +80,8 @@ class DNC(snt.RNNCore):
     self._state_size = DNCState(
         access_output=self._access_output_size,
         access_state=self._access.state_size,
-        controller_state=util.state_size_from_initial_state(
-            self._controller.initial_state(batch_size)))
+        controller_state=self._controller.state_size,
+    )
     self._output_linear = snt.Linear(
         output_size=self._output_size.as_list()[0],
         name='output_linear')
@@ -134,12 +138,13 @@ class DNC(snt.RNNCore):
         access_state=access_state,
         controller_state=controller_state)
 
-  def get_initial_state(self):
-    return self.initial_state(self._batch_size)
+  def get_initial_state(self, batch_size=None):
+    return self.initial_state(batch_size or self._batch_size)
 
-  def initial_state(self, batch_size, dtype=tf.float64):
+  def initial_state(self, batch_size):
     return DNCState(
-        controller_state=self._controller.initial_state(batch_size),
+        #controller_state=self._controller.initial_state(batch_size),
+        controller_state=self._controller.get_initial_state(batch_size=batch_size, dtype=self._dtype),
         access_state=self._access.initial_state(batch_size),
         access_output=tf.zeros(
             [batch_size] + self._access.output_size.as_list(), dtype=dtype))

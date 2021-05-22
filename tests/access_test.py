@@ -32,6 +32,7 @@ NUM_WRITES = 3
 TIME_STEPS = 4
 INPUT_SIZE = 10
 
+DTYPE=tf.float32
 
 class MemoryAccessTest(tf.test.TestCase):
 
@@ -41,7 +42,7 @@ class MemoryAccessTest(tf.test.TestCase):
     self.initial_state = self.module.initial_state(BATCH_SIZE)
 
   def testBuildAndTrain(self):
-    inputs = tf.random.normal([TIME_STEPS, BATCH_SIZE, INPUT_SIZE], dtype=tf.float64)
+    inputs = tf.random.normal([TIME_STEPS, BATCH_SIZE, INPUT_SIZE], dtype=DTYPE)
     targets = np.random.rand(TIME_STEPS, BATCH_SIZE, NUM_READS, WORD_SIZE)
     loss = lambda outputs, targets: tf.reduce_mean(input_tensor=tf.square(outputs - targets))
 
@@ -59,7 +60,7 @@ class MemoryAccessTest(tf.test.TestCase):
 
   def testValidReadMode(self):
     inputs = self.module._read_inputs(
-        tf.random.normal([BATCH_SIZE, INPUT_SIZE], dtype=tf.float64))
+        tf.random.normal([BATCH_SIZE, INPUT_SIZE], dtype=DTYPE))
     init = tf.compat.v1.global_variables_initializer()
 
     # Check that the read modes for each read head constitute a probability
@@ -84,15 +85,15 @@ class MemoryAccessTest(tf.test.TestCase):
     write_gate[:, 0] = 1
 
     inputs = {
-        'allocation_gate': tf.constant(allocation_gate),
-        'write_gate': tf.constant(write_gate),
-        'write_content_keys': tf.constant(write_content_keys),
-        'write_content_strengths': tf.constant(write_content_strengths)
+        'allocation_gate': tf.constant(allocation_gate, dtype=DTYPE),
+        'write_gate': tf.constant(write_gate, dtype=DTYPE),
+        'write_content_keys': tf.constant(write_content_keys, dtype=DTYPE),
+        'write_content_strengths': tf.constant(write_content_strengths, dtype=DTYPE)
     }
 
     weights = self.module._write_weights(inputs,
-                                         tf.constant(memory),
-                                         tf.constant(usage))
+                                         tf.constant(memory, dtype=DTYPE),
+                                         tf.constant(usage, dtype=DTYPE))
 
     weights = weights.numpy()
 
@@ -118,16 +119,20 @@ class MemoryAccessTest(tf.test.TestCase):
     read_content_keys = np.random.rand(BATCH_SIZE, NUM_READS, WORD_SIZE)
     read_content_keys[0, 0] = memory[0, 3]
     read_content_strengths = tf.constant(
-        100., shape=[BATCH_SIZE, NUM_READS], dtype=tf.float64)
+        100., shape=[BATCH_SIZE, NUM_READS], dtype=DTYPE)
     read_mode = np.random.rand(BATCH_SIZE, NUM_READS, 1 + 2 * NUM_WRITES)
     read_mode[0, 0, :] = util.one_hot(1 + 2 * NUM_WRITES, 2 * NUM_WRITES)
     inputs = {
-        'read_content_keys': tf.constant(read_content_keys),
+        'read_content_keys': tf.constant(read_content_keys, dtype=DTYPE),
         'read_content_strengths': read_content_strengths,
-        'read_mode': tf.constant(read_mode),
+        'read_mode': tf.constant(read_mode, dtype=DTYPE),
     }
-    read_weights = self.module._read_weights(inputs, memory, prev_read_weights,
-                                             link)
+    read_weights = self.module._read_weights(
+        inputs,
+        tf.cast(memory, dtype=DTYPE),
+        tf.cast(prev_read_weights, dtype=DTYPE),
+        tf.cast(link, dtype=DTYPE),
+    )
     read_weights = read_weights.numpy()
 
 
@@ -136,7 +141,7 @@ class MemoryAccessTest(tf.test.TestCase):
         read_weights[0, 0, :], util.one_hot(MEMORY_SIZE, 3), atol=1e-3)
 
   def testGradients(self):
-    inputs = tf.constant(np.random.randn(BATCH_SIZE, INPUT_SIZE), tf.float64)
+    inputs = tf.constant(np.random.randn(BATCH_SIZE, INPUT_SIZE), dtype=DTYPE)
     def evaluate_module(inputs, memory, read_weights, precedence_weights, link):
         initial_state = access.AccessState(
             memory=memory,

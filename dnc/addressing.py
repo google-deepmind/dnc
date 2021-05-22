@@ -121,7 +121,7 @@ class TemporalLinkage(snt.RNNCore):
   forward and backward directions in the link graphs.
   """
 
-  def __init__(self, memory_size, num_writes, name='temporal_linkage'):
+  def __init__(self, memory_size, num_writes, name='temporal_linkage', dtype=tf.float32):
     """Construct a TemporalLinkage module.
 
     Args:
@@ -132,7 +132,7 @@ class TemporalLinkage(snt.RNNCore):
     super(TemporalLinkage, self).__init__(name=name)
     self._memory_size = memory_size
     self._num_writes = num_writes
-    self._dtype = tf.float64
+    self._dtype = dtype
 
   def __call__(self, write_weights, prev_state):
       return self._build(write_weights, prev_state)
@@ -277,7 +277,7 @@ class Freeness(snt.RNNCore):
   to write to for a number of write heads.
   """
 
-  def __init__(self, memory_size, name='freeness'):
+  def __init__(self, memory_size, name='freeness', dtype=tf.float32):
     """Creates a Freeness module.
 
     Args:
@@ -286,7 +286,7 @@ class Freeness(snt.RNNCore):
     """
     super(Freeness, self).__init__(name=name)
     self._memory_size = memory_size
-    self._dtype = tf.float64
+    self._dtype = dtype
 
   def __call__(self, write_weights, free_gate, read_weights, prev_usage):
       return self._build(write_weights, free_gate, read_weights, prev_usage)
@@ -415,7 +415,7 @@ class Freeness(snt.RNNCore):
       sorted_allocation = sorted_nonusage * prod_sorted_usage
       inverse_indices = tf.cast(
         util.batch_invert_permutation(indices),
-        tf.int64
+        tf.int32
       )
 
       # This final line "unsorts" sorted_allocation, so that the indexing

@@ -42,9 +42,9 @@ def batch_invert_permutation(permutations):
 def batch_gather(values, indices):
   """Returns batched `tf.gather` for every row in the input."""
   with tf.compat.v1.name_scope('batch_gather', values=[values, indices]):
-    idx = tf.expand_dims(indices, -1)
+    idx = tf.expand_dims(tf.cast(indices, tf.int32), -1)
     size = tf.shape(input=indices)[0]
-    rg = tf.range(tf.cast(size, tf.int64), dtype=tf.int64)
+    rg = tf.range(tf.cast(size, tf.int32), dtype=tf.int32)
     rg = tf.expand_dims(rg, -1)
     rg = tf.tile(rg, [1, int(indices.get_shape()[-1])])
     rg = tf.expand_dims(rg, -1)

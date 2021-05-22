@@ -85,7 +85,8 @@ class MemoryAccess(snt.RNNCore):
                word_size=20,
                num_reads=1,
                num_writes=1,
-               name='memory_access'):
+               name='memory_access',
+               dtype=tf.float32):
     """Creates a MemoryAccess module.
 
     Args:
@@ -101,15 +102,15 @@ class MemoryAccess(snt.RNNCore):
     self._num_reads = num_reads
     self._num_writes = num_writes
 
-    self._dtype = tf.float64
+    self._dtype = dtype
 
     self._write_content_weights_mod = addressing.CosineWeights(
         num_writes, word_size, name='write_content_weights')
     self._read_content_weights_mod = addressing.CosineWeights(
         num_reads, word_size, name='read_content_weights')
 
-    self._linkage = addressing.TemporalLinkage(memory_size, num_writes)
-    self._freeness = addressing.Freeness(memory_size)
+    self._linkage = addressing.TemporalLinkage(memory_size, num_writes, dtype=dtype)
+    self._freeness = addressing.Freeness(memory_size, dtype=dtype)
 
     self.initialize()
 
