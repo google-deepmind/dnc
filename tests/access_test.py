@@ -41,21 +41,24 @@ random_seed.set_seed(42)
 class MemoryAccessTest(tf.test.TestCase):
 
   def setUp(self):
-    self.module = access.MemoryAccess(MEMORY_SIZE, WORD_SIZE, NUM_READS,
-                                      NUM_WRITES)
-    self.initial_state = self.module.get_initial_state(BATCH_SIZE)
+    self.cell = access.MemoryAccess(
+        MEMORY_SIZE, WORD_SIZE, NUM_READS, NUM_WRITES)
+    
+    self.module = tf.keras.layers.RNN(
+        cell=self.cell,
+        time_major=True)
 
   def testBuildAndTrain(self):
     inputs = tf.random.normal([TIME_STEPS, BATCH_SIZE, INPUT_SIZE], dtype=DTYPE)
     targets = np.random.rand(TIME_STEPS, BATCH_SIZE, NUM_READS, WORD_SIZE)
     loss = lambda outputs, targets: tf.reduce_mean(input_tensor=tf.square(outputs - targets))
-
+    print(self.module.get_initial_state(inputs))
+    import ipdb; ipdb.set_trace()
     with tf.GradientTape() as tape:
-        outputs, _ = tf.compat.v1.nn.dynamic_rnn(
-            cell=self.module,
+        outputs, _ = self.module(
             inputs=inputs,
-            initial_state=self.initial_state,
-            time_major=True)
+            #initial_state=self.initial_state,
+        )
         loss_value = loss(outputs, targets)
         gradients = tape.gradient(loss_value, self.module.trainable_variables)
 
@@ -63,7 +66,7 @@ class MemoryAccessTest(tf.test.TestCase):
     optimizer.apply_gradients(zip(gradients, self.module.trainable_variables))
 
   def testValidReadMode(self):
-    inputs = self.module._read_inputs(
+    inputs = self.cell._read_inputs(
         tf.random.normal([BATCH_SIZE, INPUT_SIZE], dtype=DTYPE))
 
     # Check that the read modes for each read head constitute a probability
@@ -94,7 +97,7 @@ class MemoryAccessTest(tf.test.TestCase):
         'write_content_strengths': tf.constant(write_content_strengths, dtype=DTYPE)
     }
 
-    weights = self.module._write_weights(inputs,
+    weights = self.cell._write_weights(inputs,
                                          tf.constant(memory, dtype=DTYPE),
                                          tf.constant(usage, dtype=DTYPE))
 
@@ -130,7 +133,7 @@ class MemoryAccessTest(tf.test.TestCase):
         'read_content_strengths': read_content_strengths,
         'read_mode': tf.constant(read_mode, dtype=DTYPE),
     }
-    read_weights = self.module._read_weights(
+    read_weights = self.cell._read_weights(
         inputs,
         tf.cast(memory, dtype=DTYPE),
         tf.cast(prev_read_weights, dtype=DTYPE),
@@ -145,16 +148,18 @@ class MemoryAccessTest(tf.test.TestCase):
 
   def testGradients(self):
     inputs = tf.constant(np.random.randn(BATCH_SIZE, INPUT_SIZE), dtype=DTYPE)
+    initial_state = self.module.get_initial_state(inputs)
+
     def evaluate_module(inputs, memory, read_weights, precedence_weights, link):
         initial_state = access.AccessState(
             memory=memory,
             read_weights=read_weights,
-            write_weights=self.initial_state.write_weights,
+            write_weights=initial_state[access.WRITE_WEIGHTS],
             linkage=addressing.TemporalLinkageState(
                 precedence_weights=precedence_weights,
                 link=link
             ),
-            usage=self.initial_state.usage
+            usage=initial_state[access.USAGE],
         )
         output, _ = self.module(inputs, initial_state)
         loss = tf.reduce_sum(input_tensor=output)
@@ -162,10 +167,10 @@ class MemoryAccessTest(tf.test.TestCase):
 
     tensors_to_check = [
         inputs,
-        self.initial_state.memory,
-        self.initial_state.read_weights,
-        self.initial_state.linkage.precedence_weights,
-        self.initial_state.linkage.link
+        initial_state[access.MEMORY],
+        initial_state[access.READ_WEIGHTS],
+        initial_state[access.LINKAGE][addressing.PRECEDENCE_WEIGHTS],
+        initial_state[access.LINKAGE][addressing.LINK],
     ]
 
     theoretical, numerical = tf.test.compute_gradient(

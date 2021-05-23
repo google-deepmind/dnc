@@ -32,13 +32,15 @@ from dnc import access, util
 DNCState = collections.namedtuple('DNCState',
     ('access_output', 'access_state', 'controller_state'))
 
+ACCESS_OUTPUT = 0
+ACCESS_STATE = 1
+CONTROLLER_STATE = 2
 
 class DNC(snt.RNNCore):
   """DNC core module.
 
   Contains controller and memory access module.
   """
-
   def __init__(self,
                access_config,
                controller_config,
@@ -76,11 +78,11 @@ class DNC(snt.RNNCore):
     self._clip_value = clip_value or 0
 
     self._output_size = tf.TensorShape([output_size])
-    self._state_size = DNCState(
-        access_output=self._access_output_size,
-        access_state=self._access.state_size,
-        controller_state=self._controller.state_size,
-    )
+    self._state_size = [
+        self._access_output_size,
+        self._access.state_size,
+        self._controller.state_size,
+    ]
     self._output_linear = snt.Linear(
         output_size=self._output_size.as_list()[0],
         name='output_linear')
@@ -90,6 +92,9 @@ class DNC(snt.RNNCore):
       return tf.clip_by_value(x, -self._clip_value, self._clip_value)
     else:
       return x
+  
+  def call(self, inputs, prev_state):
+    return self.__call__(inputs, prev_state)
 
   def __call__(self, inputs, prev_state):
     """Connects the DNC core into the graph.
@@ -107,9 +112,9 @@ class DNC(snt.RNNCore):
       is a `DNCState` tuple containing the fields `access_output`,
       `access_state`, and `controller_state`.
     """
-    prev_access_output = prev_state.access_output
-    prev_access_state = prev_state.access_state
-    prev_controller_state = prev_state.controller_state
+    prev_access_output = prev_state[ACCESS_OUTPUT]
+    prev_access_state = prev_state[ACCESS_STATE]
+    prev_controller_state = prev_state[CONTROLLER_STATE]
 
     batch_flatten = tf.keras.layers.Flatten()
     controller_input = tf.concat(
@@ -128,21 +133,33 @@ class DNC(snt.RNNCore):
     output = self._output_linear(output)
     output = self._clip_if_enabled(output)
 
-    return output, DNCState(
-        access_output=access_output,
-        access_state=access_state,
-        controller_state=controller_state)
+    return output, [
+        access_output,
+        access_state,
+        controller_state,
+    ]
 
   def initial_state(self, batch_size=None):
     return self.get_initial_state(batch_size)
 
   def get_initial_state(self, batch_size=None):
-    return DNCState(
+    return list(DNCState(
         controller_state=self._controller.get_initial_state(batch_size=batch_size, dtype=self._dtype),
-        access_state=self._access.get_initial_state(batch_size),
+        access_state=self._access.get_initial_state(batch_size=batch_size, dtype=self._dtype),
         access_output=tf.zeros(
-            [batch_size] + self._access.output_size.as_list(), dtype=self._dtype))
+            [batch_size] + self._access.output_size.as_list(), dtype=self._dtype)))
 
+  """def initial_state(self, batch_size):
+    return [
+        #controller_state
+        self._controller.get_initial_state(batch_size=batch_size, dtype=self._dtype),
+        #access_state
+        self._access.initial_state(batch_size),
+        #access_output
+        tf.zeros(
+            [batch_size] + self._access.output_size.as_list(), dtype=self._dtype)
+    ]"""
+    
   @property
   def state_size(self):
     return self._state_size

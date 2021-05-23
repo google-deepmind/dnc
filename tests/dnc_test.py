@@ -88,7 +88,7 @@ class DNCCoreTest(tf.test.TestCase):
       outputs, _ = tf.compat.v1.nn.dynamic_rnn(
           cell=self.module,
           inputs=inputs,
-          initial_state=self.initial_state,
+          #initial_state=self.initial_state,
           time_major=True)
       loss_value = loss(outputs, targets)
       gradients = tape.gradient(loss_value, self.module.trainable_variables)

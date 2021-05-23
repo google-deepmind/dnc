@@ -100,18 +100,19 @@ def train_step_graphed(
   """Runs model on input sequence."""
   initial_state = rnn_model.get_initial_state()
   with tf.GradientTape() as tape:
-    output_sequence, _ = tf.compat.v1.nn.dynamic_rnn(
+    """output_sequence, _ = tf.compat.v1.nn.dynamic_rnn(
         cell=rnn_model,
         inputs=x,
         time_major=True,
         initial_state=initial_state)
     # Unable to migrate to tf.keras.layers.RNN due to contraints on RNN state structure
-    """output_sequence = tf.keras.layers.RNN(
+    """
+    output_sequence = tf.keras.layers.RNN(
         cell=rnn_model,
         time_major=True,
         inputs=x,
         initial_state=initial_state,
-    )"""
+    )
     loss_value = loss_fn(output_sequence, y, mask)
   grads = tape.gradient(loss_value, rnn_model.trainable_variables)
   grads, _ = tf.clip_by_global_norm(grads, FLAGS.max_grad_norm)

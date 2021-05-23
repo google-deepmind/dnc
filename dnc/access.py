@@ -28,6 +28,11 @@ from dnc import addressing, util
 AccessState = collections.namedtuple('AccessState', (
     'memory', 'read_weights', 'write_weights', 'linkage', 'usage'))
 
+MEMORY = 0
+READ_WEIGHTS = 1
+WRITE_WEIGHTS = 2
+LINKAGE = 3
+USAGE = 4
 
 def _erase_and_write(memory, address, reset_weights, values):
   """Module to erase and write in the external memory.
@@ -113,6 +118,9 @@ class MemoryAccess(snt.RNNCore):
 
     self._linear_layers = {}
 
+  def call(self, inputs, prev_state):
+    return self.__call__(inputs, prev_state)
+
   def __call__(self, inputs, prev_state):
     """Connects the MemoryAccess module into the graph.
 
@@ -126,6 +134,13 @@ class MemoryAccess(snt.RNNCore):
       `[batch_size, num_reads, word_size]`, and `next_state` is the new
       `AccessState` named tuple at the current time t.
     """
+    prev_state = AccessState(
+        memory=prev_state[MEMORY],
+        read_weights=prev_state[READ_WEIGHTS],
+        write_weights=prev_state[WRITE_WEIGHTS],
+        linkage=prev_state[LINKAGE],
+        usage=prev_state[USAGE],
+    )
     #import ipdb; ipdb.set_trace()
     inputs = self._read_inputs(inputs)
 
@@ -144,7 +159,7 @@ class MemoryAccess(snt.RNNCore):
         reset_weights=inputs['erase_vectors'],
         values=inputs['write_vectors'])
 
-    linkage_state = self._linkage(write_weights, prev_state.linkage)
+    linkage_state = addressing.TemporalLinkageState(*self._linkage(write_weights, prev_state.linkage))
 
     # Read from memory.
     read_weights = self._read_weights(
@@ -154,12 +169,12 @@ class MemoryAccess(snt.RNNCore):
         link=linkage_state.link)
     read_words = tf.matmul(read_weights, memory)
 
-    return (read_words, AccessState(
+    return (read_words, list(AccessState(
         memory=memory,
         read_weights=read_weights,
         write_weights=write_weights,
-        linkage=linkage_state,
-        usage=usage))
+        linkage=list(linkage_state),
+        usage=usage)))
 
   def _read_inputs(self, inputs):
     """Applies transformations to `inputs` to get control for this module."""
@@ -304,23 +319,29 @@ class MemoryAccess(snt.RNNCore):
 
     return read_weights
 
+    """
   # keras uses get_initial_state
   def get_initial_state(self, batch_size):
     return util.initial_state_from_state_size(self.state_size, batch_size, self._dtype)
-
+"""
   # snt.RNNCore uses initial_state
   def initial_state(self, batch_size):
     return self.get_initial_state(batch_size)
-
   @property
   def state_size(self):
     """Returns a tuple of the shape of the state tensors."""
-    return AccessState(
+    """return list(AccessState(
         memory=tf.TensorShape([self._memory_size, self._word_size]),
         read_weights=tf.TensorShape([self._num_reads, self._memory_size]),
         write_weights=tf.TensorShape([self._num_writes, self._memory_size]),
         linkage=self._linkage.state_size,
-        usage=self._freeness.state_size)
+        usage=self._freeness.state_size))"""
+    return tuple(AccessState(
+        memory=[self._memory_size, self._word_size],
+        read_weights=[self._num_reads, self._memory_size],
+        write_weights=[self._num_writes, self._memory_size],
+        linkage=self._linkage.state_size,
+        usage=self._freeness.state_size))
 
   @property
   def output_size(self):

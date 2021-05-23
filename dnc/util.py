@@ -84,6 +84,11 @@ def state_size_from_initial_state(initial_state):
 def initial_state_from_state_size(state_size, batch_size, dtype):
     if isinstance(state_size, tf.TensorShape):
         return tf.zeros(batch_size + state_size, dtype=dtype)
+    elif isinstance(state_size, list):
+        return [
+            initial_state_from_state_size(s, batch_size, dtype)
+            for s in state_size
+        ]
 
     initial_state_dict = {}
     for field, value in state_size._asdict().items():

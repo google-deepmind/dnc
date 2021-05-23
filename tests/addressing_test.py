@@ -155,8 +155,8 @@ class TemporalLinkageTest(tf.test.TestCase):
             write_weights[0, 0, :] = util.one_hot(memory_size, 1)
             write_weights[0, 1, :] = util.one_hot(memory_size, 2)
 
-        prev_link_in = state.link
-        prev_precedence_weights_in = state.precedence_weights
+        prev_link_in = state[addressing.LINK]
+        prev_precedence_weights_in = state[addressing.PRECEDENCE_WEIGHTS]
         write_weights_in = write_weights
 
         state = module(
@@ -167,35 +167,37 @@ class TemporalLinkageTest(tf.test.TestCase):
             )
         )
 
+    result_link = state[addressing.LINK]
+
     # link should be bounded in range [0, 1]
-    self.assertGreaterEqual(tf.math.reduce_min(state.link), 0)
-    self.assertLessEqual(tf.math.reduce_max(state.link), 1)
+    self.assertGreaterEqual(tf.math.reduce_min(result_link), 0)
+    self.assertLessEqual(tf.math.reduce_max(result_link), 1)
 
     # link diagonal should be zero
     self.assertAllEqual(
-        tf.linalg.diag_part(state.link),
+        tf.linalg.diag_part(result_link),
         np.zeros([batch_size, num_writes, memory_size]))
 
     # link rows and columns should sum to at most 1
     self.assertLessEqual(
-        tf.math.reduce_max(tf.math.reduce_sum(state.link, axis=2)), 1)
+        tf.math.reduce_max(tf.math.reduce_sum(result_link, axis=2)), 1)
     self.assertLessEqual(
-        tf.math.reduce_max(tf.math.reduce_sum(state.link, axis=3)), 1)
+        tf.math.reduce_max(tf.math.reduce_sum(result_link, axis=3)), 1)
 
     # records our transitions in batch 0: head 0: 0->1, and head 1: 3->2
-    self.assertAllEqual(state.link[0, 0, :, 0], util.one_hot(memory_size, 1))
-    self.assertAllEqual(state.link[0, 1, :, 3], util.one_hot(memory_size, 2))
+    self.assertAllEqual(result_link[0, 0, :, 0], util.one_hot(memory_size, 1))
+    self.assertAllEqual(result_link[0, 1, :, 3], util.one_hot(memory_size, 2))
 
     # Now test calculation of forward and backward read weights
     prev_read_weights = np.random.rand(batch_size, num_reads, memory_size)
     prev_read_weights[0, 5, :] = util.one_hot(memory_size, 0)  # read 5, posn 0
     prev_read_weights[0, 6, :] = util.one_hot(memory_size, 2)  # read 6, posn 2
     forward_read_weights = module.directional_read_weights(
-        tf.constant(state.link),
+        tf.constant(result_link),
         tf.constant(prev_read_weights, dtype=tf.float64),
         forward=True)
     backward_read_weights = module.directional_read_weights(
-        tf.constant(state.link),
+        tf.constant(result_link),
         tf.constant(prev_read_weights, dtype=tf.float64),
         forward=False)
 

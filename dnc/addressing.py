@@ -30,6 +30,8 @@ _EPSILON = 1e-6
 TemporalLinkageState = collections.namedtuple('TemporalLinkageState',
                                               ('link', 'precedence_weights'))
 
+LINK = 0
+PRECEDENCE_WEIGHTS = 1
 
 def _vector_norms(m):
   squared_norms = tf.compat.v1.reduce_sum(input_tensor=m * m, axis=2, keepdims=True)
@@ -146,12 +148,12 @@ class TemporalLinkage(snt.RNNCore):
       A `TemporalLinkageState` tuple `next_state`, which contains the updated
       link and precedence weights.
     """
-    link = self._link(prev_state.link, prev_state.precedence_weights,
+    link = self._link(prev_state[LINK], prev_state[PRECEDENCE_WEIGHTS],
                       write_weights)
-    precedence_weights = self._precedence_weights(prev_state.precedence_weights,
+    precedence_weights = self._precedence_weights(prev_state[PRECEDENCE_WEIGHTS],
                                                   write_weights)
-    return TemporalLinkageState(
-        link=link, precedence_weights=precedence_weights)
+    return list(TemporalLinkageState(
+        link=link, precedence_weights=precedence_weights))
 
   def directional_read_weights(self, link, prev_read_weights, forward):
     """Calculates the forward or the backward read weights.
@@ -244,12 +246,16 @@ class TemporalLinkage(snt.RNNCore):
   @property
   def state_size(self):
       """Returns a `TemporalLinkageState` tuple of the state tensors' shapes."""
-      return TemporalLinkageState(
+      """return list(TemporalLinkageState(
           link=tf.TensorShape(
               [self._num_writes, self._memory_size, self._memory_size]),
           precedence_weights=tf.TensorShape(
               [self._num_writes, self._memory_size])
-      )
+      ))"""
+      return list(TemporalLinkageState(
+          link=(self._num_writes, self._memory_size, self._memory_size),
+          precedence_weights=(self._num_writes, self._memory_size),
+      ))
 
 class Freeness(snt.RNNCore):
   """Memory usage that is increased by writing and decreased by reading.
@@ -413,4 +419,5 @@ class Freeness(snt.RNNCore):
   @property
   def state_size(self):
     """Returns the shape of the state tensor."""
-    return tf.TensorShape([self._memory_size])
+    #return tf.TensorShape([self._memory_size])
+    return (self._memory_size,)
