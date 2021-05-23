@@ -20,7 +20,6 @@ from __future__ import print_function
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.python.ops import rnn
 
 from dnc import access, addressing, util
 
@@ -34,12 +33,17 @@ INPUT_SIZE = 10
 
 DTYPE=tf.float32
 
+# set seeds for determinism
+np.random.seed(42)
+from tensorflow.python.framework import random_seed
+random_seed.set_seed(42)
+
 class MemoryAccessTest(tf.test.TestCase):
 
   def setUp(self):
     self.module = access.MemoryAccess(MEMORY_SIZE, WORD_SIZE, NUM_READS,
                                       NUM_WRITES)
-    self.initial_state = self.module.initial_state(BATCH_SIZE)
+    self.initial_state = self.module.get_initial_state(BATCH_SIZE)
 
   def testBuildAndTrain(self):
     inputs = tf.random.normal([TIME_STEPS, BATCH_SIZE, INPUT_SIZE], dtype=DTYPE)
@@ -47,7 +51,7 @@ class MemoryAccessTest(tf.test.TestCase):
     loss = lambda outputs, targets: tf.reduce_mean(input_tensor=tf.square(outputs - targets))
 
     with tf.GradientTape() as tape:
-        outputs, _ = rnn.dynamic_rnn(
+        outputs, _ = tf.compat.v1.nn.dynamic_rnn(
             cell=self.module,
             inputs=inputs,
             initial_state=self.initial_state,
@@ -61,7 +65,6 @@ class MemoryAccessTest(tf.test.TestCase):
   def testValidReadMode(self):
     inputs = self.module._read_inputs(
         tf.random.normal([BATCH_SIZE, INPUT_SIZE], dtype=DTYPE))
-    init = tf.compat.v1.global_variables_initializer()
 
     # Check that the read modes for each read head constitute a probability
     # distribution.
@@ -158,7 +161,9 @@ class MemoryAccessTest(tf.test.TestCase):
         return loss
 
     tensors_to_check = [
-        inputs, self.initial_state.memory, self.initial_state.read_weights,
+        inputs,
+        self.initial_state.memory,
+        self.initial_state.read_weights,
         self.initial_state.linkage.precedence_weights,
         self.initial_state.linkage.link
     ]
@@ -170,5 +175,6 @@ class MemoryAccessTest(tf.test.TestCase):
     )
     self.assertLess(
         sum([tf.norm(numerical[i] - theoretical[i]) for i in range(2)]),
-        0.01
+        0.02,
+        tensors_to_check
     )

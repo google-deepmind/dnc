@@ -24,6 +24,10 @@ import tensorflow as tf
 
 from dnc import addressing, util
 
+# set seeds for determinism
+np.random.seed(42)
+from tensorflow.python.framework import random_seed
+random_seed.set_seed(42)
 
 class WeightedSoftmaxTest(tf.test.TestCase):
 
@@ -115,13 +119,9 @@ class CosineWeightsTest(tf.test.TestCase):
     mem = tf.Variable(tf.concat((first_row_ones, remaining_zeros), 1))
 
     with tf.GradientTape() as gtape:
-        #gtape.watch(mem)
-        #gtape.watch(keys)
-        #gtape.watch(strengths)
         output = module(mem, keys, strengths)
         gradients = gtape.gradient(target=output, sources=[mem, keys, strengths])
 
-    #import ipdb; ipdb.set_trace()
     self.assertFalse(np.any(np.isnan(output)))
     self.assertFalse(np.any(np.isnan(gradients[0])))
     self.assertFalse(np.any(np.isnan(gradients[1])))

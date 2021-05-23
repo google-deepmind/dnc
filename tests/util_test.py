@@ -23,6 +23,8 @@ import tensorflow as tf
 
 from dnc import util
 
+# set seeds for determinism
+np.random.seed(42)
 
 class BatchInvertPermutation(tf.test.TestCase):
 
