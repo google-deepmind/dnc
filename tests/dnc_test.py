@@ -75,7 +75,7 @@ class DNCCoreTest(tf.test.TestCase):
         name='dnc_test',
         dtype=DTYPE,
       )
-      self.initial_state = self.module.get_initial_state(BATCH_SIZE)
+      self.initial_state = self.module.get_initial_state(batch_size=BATCH_SIZE)
 
   def testBuildAndTrain(self):
     inputs = tf.random.normal([TIME_STEPS, BATCH_SIZE, INPUT_SIZE], dtype=DTYPE)
@@ -85,11 +85,15 @@ class DNCCoreTest(tf.test.TestCase):
       LEARNING_RATE, epsilon=OPTIMIZER_EPSILON)
 
     with tf.GradientTape() as tape:
-      outputs, _ = tf.compat.v1.nn.dynamic_rnn(
+      #outputs, _ = tf.compat.v1.nn.dynamic_rnn(
+      outputs = tf.keras.layers.RNN(
           cell=self.module,
+          time_major=True,
+          return_sequences=True,
+      )(
           inputs=inputs,
-          #initial_state=self.initial_state,
-          time_major=True)
+          initial_state=self.initial_state,
+      )
       loss_value = loss(outputs, targets)
       gradients = tape.gradient(loss_value, self.module.trainable_variables)
 

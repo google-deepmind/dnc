@@ -134,13 +134,7 @@ class MemoryAccess(snt.RNNCore):
       `[batch_size, num_reads, word_size]`, and `next_state` is the new
       `AccessState` named tuple at the current time t.
     """
-    prev_state = AccessState(
-        memory=prev_state[MEMORY],
-        read_weights=prev_state[READ_WEIGHTS],
-        write_weights=prev_state[WRITE_WEIGHTS],
-        linkage=prev_state[LINKAGE],
-        usage=prev_state[USAGE],
-    )
+    prev_state = AccessState(*prev_state)
     #import ipdb; ipdb.set_trace()
     inputs = self._read_inputs(inputs)
 
@@ -319,27 +313,21 @@ class MemoryAccess(snt.RNNCore):
 
     return read_weights
 
-    """
   # keras uses get_initial_state
-  def get_initial_state(self, batch_size):
+  def get_initial_state(self, batch_size=None, inputs=None, dtype=None):
     return util.initial_state_from_state_size(self.state_size, batch_size, self._dtype)
-"""
+
   # snt.RNNCore uses initial_state
   def initial_state(self, batch_size):
     return self.get_initial_state(batch_size)
+  
   @property
   def state_size(self):
     """Returns a tuple of the shape of the state tensors."""
-    """return list(AccessState(
+    return list(AccessState(
         memory=tf.TensorShape([self._memory_size, self._word_size]),
         read_weights=tf.TensorShape([self._num_reads, self._memory_size]),
         write_weights=tf.TensorShape([self._num_writes, self._memory_size]),
-        linkage=self._linkage.state_size,
-        usage=self._freeness.state_size))"""
-    return tuple(AccessState(
-        memory=[self._memory_size, self._word_size],
-        read_weights=[self._num_reads, self._memory_size],
-        write_weights=[self._num_writes, self._memory_size],
         linkage=self._linkage.state_size,
         usage=self._freeness.state_size))
 

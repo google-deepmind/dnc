@@ -83,14 +83,17 @@ def state_size_from_initial_state(initial_state):
 
 def initial_state_from_state_size(state_size, batch_size, dtype):
     if isinstance(state_size, tf.TensorShape):
-        return tf.zeros(batch_size + state_size, dtype=dtype)
+        return tf.zeros([batch_size] + state_size.as_list(), dtype=dtype)
     elif isinstance(state_size, list):
         return [
             initial_state_from_state_size(s, batch_size, dtype)
             for s in state_size
         ]
-
-    initial_state_dict = {}
-    for field, value in state_size._asdict().items():
-        initial_state_dict[field] = initial_state_from_state_size(value, batch_size, dtype)
-    return type(state_size)(**initial_state_dict)
+    # Not used anymore since migration off of namedtuple state representation
+    elif isinstance(state_size, namedtuple):
+        initial_state_dict = {}
+        for field, value in state_size._asdict().items():
+            initial_state_dict[field] = initial_state_from_state_size(value, batch_size, dtype)
+        return type(state_size)(**initial_state_dict)
+    
+    raise NotImplemented(f"Cannot parse initial_state from state_size of type {type(state)}: {state}")

@@ -43,21 +43,21 @@ class MemoryAccessTest(tf.test.TestCase):
   def setUp(self):
     self.cell = access.MemoryAccess(
         MEMORY_SIZE, WORD_SIZE, NUM_READS, NUM_WRITES)
-    
+    #self.initial_state = self.cell.get_initial_state(BATCH_SIZE)
     self.module = tf.keras.layers.RNN(
         cell=self.cell,
-        time_major=True)
+        time_major=True,
+        return_sequences=True,
+    )
 
   def testBuildAndTrain(self):
     inputs = tf.random.normal([TIME_STEPS, BATCH_SIZE, INPUT_SIZE], dtype=DTYPE)
     targets = np.random.rand(TIME_STEPS, BATCH_SIZE, NUM_READS, WORD_SIZE)
     loss = lambda outputs, targets: tf.reduce_mean(input_tensor=tf.square(outputs - targets))
-    print(self.module.get_initial_state(inputs))
-    import ipdb; ipdb.set_trace()
     with tf.GradientTape() as tape:
-        outputs, _ = self.module(
+        outputs = self.module(
             inputs=inputs,
-            #initial_state=self.initial_state,
+            initial_state=self.module.get_initial_state(inputs),#self.initial_state,
         )
         loss_value = loss(outputs, targets)
         gradients = tape.gradient(loss_value, self.module.trainable_variables)
@@ -147,21 +147,21 @@ class MemoryAccessTest(tf.test.TestCase):
         read_weights[0, 0, :], util.one_hot(MEMORY_SIZE, 3), atol=1e-3)
 
   def testGradients(self):
-    inputs = tf.constant(np.random.randn(BATCH_SIZE, INPUT_SIZE), dtype=DTYPE)
-    initial_state = self.module.get_initial_state(inputs)
-
+    inputs = tf.constant(np.random.randn(1, BATCH_SIZE, INPUT_SIZE), dtype=DTYPE)
+    test_initial_state = self.module.get_initial_state(inputs=inputs)
+    initial_state = test_initial_state #self.initial_state
     def evaluate_module(inputs, memory, read_weights, precedence_weights, link):
-        initial_state = access.AccessState(
+        init_state = list(access.AccessState(
             memory=memory,
             read_weights=read_weights,
             write_weights=initial_state[access.WRITE_WEIGHTS],
-            linkage=addressing.TemporalLinkageState(
+            linkage=list(addressing.TemporalLinkageState(
                 precedence_weights=precedence_weights,
                 link=link
-            ),
+            )),
             usage=initial_state[access.USAGE],
-        )
-        output, _ = self.module(inputs, initial_state)
+        ))
+        output = self.module(inputs, init_state)
         loss = tf.reduce_sum(input_tensor=output)
         return loss
 

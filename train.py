@@ -54,13 +54,13 @@ parser.add_argument("--batch_size", default=16, type=int, help=
                       "Batch size for training.")
 parser.add_argument("--num_bits", default=4, type=int, help=
                       "Dimensionality of each vector to copy")
-parser.add_argument("--min_length", default=1, type=int, help=
+parser.add_argument("--min_length", default=2, type=int, help=
                       "Lower limit on number of vectors in the observation pattern to copy")
 parser.add_argument("--max_length", default=3, type=int, help=
                       "Upper limit on number of vectors in the observation pattern to copy")
 parser.add_argument("--min_repeats", default=1, type=int, help=
                       "Lower limit on number of copy repeats.")
-parser.add_argument("--max_repeats", default=7, type=int, help=
+parser.add_argument("--max_repeats", default=3, type=int, help=
                       "Upper limit on number of copy repeats.")
 
 # Training options.
@@ -98,7 +98,7 @@ def train_step_graphed(
     loss_fn,
 ):
   """Runs model on input sequence."""
-  initial_state = rnn_model.get_initial_state()
+  initial_state = rnn_model.get_initial_state(x)
   with tf.GradientTape() as tape:
     """output_sequence, _ = tf.compat.v1.nn.dynamic_rnn(
         cell=rnn_model,
@@ -107,9 +107,7 @@ def train_step_graphed(
         initial_state=initial_state)
     # Unable to migrate to tf.keras.layers.RNN due to contraints on RNN state structure
     """
-    output_sequence = tf.keras.layers.RNN(
-        cell=rnn_model,
-        time_major=True,
+    output_sequence = rnn_model(
         inputs=x,
         initial_state=initial_state,
     )
@@ -136,12 +134,11 @@ def test_step_graphed(
     rnn_model,
     loss_fn,
 ):
-  initial_state = rnn_model.get_initial_state()
-  output_sequence, _ = tf.compat.v1.nn.dynamic_rnn(
-    cell=rnn_model,
+  initial_state = rnn_model.get_initial_state(x)
+  output_sequence = rnn_model(
     inputs=x,
-    time_major=True,
-    initial_state=initial_state)
+    initial_state=initial_state,
+  )
   loss_value = loss_fn(output_sequence, y, mask)
   # Used for visualization.
   output = tf.round(
@@ -170,8 +167,13 @@ def train(num_training_iterations, report_interval):
   }
   clip_value = FLAGS.clip_value
 
-  dnc_core = dnc.DNC(
+  dnc_cell = dnc.DNC(
     access_config, controller_config, dataset.target_size, FLAGS.batch_size, clip_value)
+  dnc_core = tf.keras.layers.RNN(
+    cell=dnc_cell,
+    time_major=True,
+    return_sequences=True,
+  )
   optimizer = tf.compat.v1.train.RMSPropOptimizer(
       FLAGS.learning_rate, epsilon=FLAGS.optimizer_epsilon)
   loss_fn = dataset.cost

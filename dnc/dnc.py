@@ -72,19 +72,18 @@ class DNC(snt.RNNCore):
     self._controller = tf.keras.layers.LSTMCell(**controller_config, dtype=dtype)
     self._access = access.MemoryAccess(**access_config, dtype=dtype)
 
-    self._access_output_size = np.prod(self._access.output_size.as_list())
     self._output_size = output_size
     self._batch_size = batch_size
     self._clip_value = clip_value or 0
 
     self._output_size = tf.TensorShape([output_size])
-    self._state_size = [
-        self._access_output_size,
-        self._access.state_size,
-        self._controller.state_size,
-    ]
+    self._state_size = list(DNCState(
+        access_output=self._access.output_size,
+        access_state=self._access.state_size,
+        controller_state=[tf.TensorShape([i]) for i in self._controller.state_size],
+    ))
     self._output_linear = snt.Linear(
-        output_size=self._output_size.as_list()[0],
+        output_size=output_size,
         name='output_linear')
 
   def _clip_if_enabled(self, x):
@@ -112,40 +111,38 @@ class DNC(snt.RNNCore):
       is a `DNCState` tuple containing the fields `access_output`,
       `access_state`, and `controller_state`.
     """
-    prev_access_output = prev_state[ACCESS_OUTPUT]
-    prev_access_state = prev_state[ACCESS_STATE]
-    prev_controller_state = prev_state[CONTROLLER_STATE]
+    prev_state = DNCState(*prev_state)
 
     batch_flatten = tf.keras.layers.Flatten()
     controller_input = tf.concat(
-        [batch_flatten(inputs), batch_flatten(prev_access_output)], 1)
+        [batch_flatten(inputs), batch_flatten(prev_state.access_output)], 1)
 
     controller_output, controller_state = self._controller(
-        controller_input, prev_controller_state)
+        controller_input, prev_state.controller_state)
 
     controller_output = self._clip_if_enabled(controller_output)
     controller_state = tf.nest.map_structure(self._clip_if_enabled, controller_state)
 
     access_output, access_state = self._access(controller_output,
-                                               prev_access_state)
+                                               prev_state.access_state)
 
     output = tf.concat([controller_output, batch_flatten(access_output)], 1)
     output = self._output_linear(output)
     output = self._clip_if_enabled(output)
 
-    return output, [
+    return output, list(DNCState(
         access_output,
         access_state,
         controller_state,
-    ]
+    ))
 
   def initial_state(self, batch_size=None):
     return self.get_initial_state(batch_size)
 
-  def get_initial_state(self, batch_size=None):
+  def get_initial_state(self, batch_size=None, inputs=None, dtype=None):
     return list(DNCState(
         controller_state=self._controller.get_initial_state(batch_size=batch_size, dtype=self._dtype),
-        access_state=self._access.get_initial_state(batch_size=batch_size, dtype=self._dtype),
+        access_state=self._access.get_initial_state(batch_size=batch_size),
         access_output=tf.zeros(
             [batch_size] + self._access.output_size.as_list(), dtype=self._dtype)))
 
