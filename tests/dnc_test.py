@@ -28,6 +28,7 @@ from dnc import repeat_copy
 # set seeds for determinism
 np.random.seed(42)
 from tensorflow.python.framework import random_seed
+
 random_seed.set_seed(42)
 
 DTYPE = tf.float32
@@ -53,49 +54,51 @@ OUTPUT_SIZE = 4
 
 
 class DNCCoreTest(tf.test.TestCase):
+    def setUp(self):
+        access_config = {
+            "memory_size": MEMORY_SIZE,
+            "word_size": WORD_SIZE,
+            "num_reads": NUM_READ_HEADS,
+            "num_writes": NUM_WRITE_HEADS,
+        }
+        controller_config = {
+            # "hidden_size": FLAGS.hidden_size,
+            "units": HIDDEN_SIZE,
+        }
 
-  def setUp(self):
-      access_config = {
-          "memory_size": MEMORY_SIZE,
-          "word_size": WORD_SIZE,
-          "num_reads": NUM_READ_HEADS,
-          "num_writes": NUM_WRITE_HEADS,
-      }
-      controller_config = {
-        #"hidden_size": FLAGS.hidden_size,
-        "units": HIDDEN_SIZE,
-      }
+        self.module = dnc.DNC(
+            access_config,
+            controller_config,
+            OUTPUT_SIZE,
+            BATCH_SIZE,
+            CLIP_VALUE,
+            name="dnc_test",
+            dtype=DTYPE,
+        )
+        self.initial_state = self.module.get_initial_state(batch_size=BATCH_SIZE)
 
-      self.module = dnc.DNC(
-        access_config, 
-        controller_config, 
-        OUTPUT_SIZE, 
-        BATCH_SIZE,
-        CLIP_VALUE,
-        name='dnc_test',
-        dtype=DTYPE,
-      )
-      self.initial_state = self.module.get_initial_state(batch_size=BATCH_SIZE)
+    def testBuildAndTrain(self):
+        inputs = tf.random.normal([TIME_STEPS, BATCH_SIZE, INPUT_SIZE], dtype=DTYPE)
+        targets = np.random.rand(TIME_STEPS, BATCH_SIZE, OUTPUT_SIZE)
+        loss = lambda outputs, targets: tf.reduce_mean(
+            input_tensor=tf.square(outputs - targets)
+        )
+        optimizer = tf.compat.v1.train.RMSPropOptimizer(
+            LEARNING_RATE, epsilon=OPTIMIZER_EPSILON
+        )
 
-  def testBuildAndTrain(self):
-    inputs = tf.random.normal([TIME_STEPS, BATCH_SIZE, INPUT_SIZE], dtype=DTYPE)
-    targets = np.random.rand(TIME_STEPS, BATCH_SIZE, OUTPUT_SIZE)
-    loss = lambda outputs, targets: tf.reduce_mean(input_tensor=tf.square(outputs - targets))
-    optimizer = tf.compat.v1.train.RMSPropOptimizer(
-      LEARNING_RATE, epsilon=OPTIMIZER_EPSILON)
+        with tf.GradientTape() as tape:
+            # outputs, _ = tf.compat.v1.nn.dynamic_rnn(
+            outputs = tf.keras.layers.RNN(
+                cell=self.module,
+                time_major=True,
+                return_sequences=True,
+            )(
+                inputs=inputs,
+                initial_state=self.initial_state,
+            )
+            loss_value = loss(outputs, targets)
+            gradients = tape.gradient(loss_value, self.module.trainable_variables)
 
-    with tf.GradientTape() as tape:
-      #outputs, _ = tf.compat.v1.nn.dynamic_rnn(
-      outputs = tf.keras.layers.RNN(
-          cell=self.module,
-          time_major=True,
-          return_sequences=True,
-      )(
-          inputs=inputs,
-          initial_state=self.initial_state,
-      )
-      loss_value = loss(outputs, targets)
-      gradients = tape.gradient(loss_value, self.module.trainable_variables)
-
-    grads, _ = tf.clip_by_global_norm(gradients, MAX_GRAD_NORM)
-    optimizer.apply_gradients(zip(gradients, self.module.trainable_variables))
+        grads, _ = tf.clip_by_global_norm(gradients, MAX_GRAD_NORM)
+        optimizer.apply_gradients(zip(gradients, self.module.trainable_variables))

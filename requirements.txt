@@ -1,6 +1,7 @@
 absl-py==0.12.0
 astunparse==1.6.3
 attrs==21.2.0
+black==21.6b0
 cachetools==4.2.2
 certifi==2020.12.5
 chardet==4.0.0

@@ -31,155 +31,157 @@ NUM_WRITES = 3
 TIME_STEPS = 4
 INPUT_SIZE = 10
 
-DTYPE=tf.float32
+DTYPE = tf.float32
 
 # set seeds for determinism
 np.random.seed(42)
 from tensorflow.python.framework import random_seed
+
 random_seed.set_seed(42)
 
+
 class MemoryAccessTest(tf.test.TestCase):
-
-  def setUp(self):
-    self.cell = access.MemoryAccess(
-        MEMORY_SIZE, WORD_SIZE, NUM_READS, NUM_WRITES)
-    #self.initial_state = self.cell.get_initial_state(BATCH_SIZE)
-    self.module = tf.keras.layers.RNN(
-        cell=self.cell,
-        time_major=True,
-        return_sequences=True,
-    )
-
-  def testBuildAndTrain(self):
-    inputs = tf.random.normal([TIME_STEPS, BATCH_SIZE, INPUT_SIZE], dtype=DTYPE)
-    targets = np.random.rand(TIME_STEPS, BATCH_SIZE, NUM_READS, WORD_SIZE)
-    loss = lambda outputs, targets: tf.reduce_mean(input_tensor=tf.square(outputs - targets))
-    with tf.GradientTape() as tape:
-        outputs = self.module(
-            inputs=inputs,
-            initial_state=self.module.get_initial_state(inputs),#self.initial_state,
+    def setUp(self):
+        self.cell = access.MemoryAccess(MEMORY_SIZE, WORD_SIZE, NUM_READS, NUM_WRITES)
+        self.module = tf.keras.layers.RNN(
+            cell=self.cell,
+            time_major=True,
+            return_sequences=True,
         )
-        loss_value = loss(outputs, targets)
-        gradients = tape.gradient(loss_value, self.module.trainable_variables)
 
-    optimizer = tf.keras.optimizers.SGD(learning_rate=0.1)
-    optimizer.apply_gradients(zip(gradients, self.module.trainable_variables))
+    def testBuildAndTrain(self):
+        inputs = tf.random.normal([TIME_STEPS, BATCH_SIZE, INPUT_SIZE], dtype=DTYPE)
+        targets = np.random.rand(TIME_STEPS, BATCH_SIZE, NUM_READS, WORD_SIZE)
+        loss = lambda outputs, targets: tf.reduce_mean(
+            input_tensor=tf.square(outputs - targets)
+        )
+        with tf.GradientTape() as tape:
+            outputs = self.module(
+                inputs=inputs,
+                initial_state=self.module.get_initial_state(inputs),
+            )
+            loss_value = loss(outputs, targets)
+            gradients = tape.gradient(loss_value, self.module.trainable_variables)
 
-  def testValidReadMode(self):
-    inputs = self.cell._read_inputs(
-        tf.random.normal([BATCH_SIZE, INPUT_SIZE], dtype=DTYPE))
+        optimizer = tf.keras.optimizers.SGD(learning_rate=0.1)
+        optimizer.apply_gradients(zip(gradients, self.module.trainable_variables))
 
-    # Check that the read modes for each read head constitute a probability
-    # distribution.
-    self.assertAllClose(inputs['read_mode'].numpy().sum(2),
-                        np.ones([BATCH_SIZE, NUM_READS]))
-    self.assertGreaterEqual(inputs['read_mode'].numpy().min(), 0)
+    def testValidReadMode(self):
+        inputs = self.cell._read_inputs(
+            tf.random.normal([BATCH_SIZE, INPUT_SIZE], dtype=DTYPE)
+        )
 
-  def testWriteWeights(self):
-    memory = 10 * (np.random.rand(BATCH_SIZE, MEMORY_SIZE, WORD_SIZE) - 0.5)
-    usage = np.random.rand(BATCH_SIZE, MEMORY_SIZE)
+        # Check that the read modes for each read head constitute a probability
+        # distribution.
+        self.assertAllClose(
+            inputs["read_mode"].numpy().sum(2), np.ones([BATCH_SIZE, NUM_READS])
+        )
+        self.assertGreaterEqual(inputs["read_mode"].numpy().min(), 0)
 
-    allocation_gate = np.random.rand(BATCH_SIZE, NUM_WRITES)
-    write_gate = np.random.rand(BATCH_SIZE, NUM_WRITES)
-    write_content_keys = np.random.rand(BATCH_SIZE, NUM_WRITES, WORD_SIZE)
-    write_content_strengths = np.random.rand(BATCH_SIZE, NUM_WRITES)
+    def testWriteWeights(self):
+        memory = 10 * (np.random.rand(BATCH_SIZE, MEMORY_SIZE, WORD_SIZE) - 0.5)
+        usage = np.random.rand(BATCH_SIZE, MEMORY_SIZE)
 
-    # Check that turning on allocation gate fully brings the write gate to
-    # the allocation weighting (which we will control by controlling the usage).
-    usage[:, 3] = 0
-    allocation_gate[:, 0] = 1
-    write_gate[:, 0] = 1
+        allocation_gate = np.random.rand(BATCH_SIZE, NUM_WRITES)
+        write_gate = np.random.rand(BATCH_SIZE, NUM_WRITES)
+        write_content_keys = np.random.rand(BATCH_SIZE, NUM_WRITES, WORD_SIZE)
+        write_content_strengths = np.random.rand(BATCH_SIZE, NUM_WRITES)
 
-    inputs = {
-        'allocation_gate': tf.constant(allocation_gate, dtype=DTYPE),
-        'write_gate': tf.constant(write_gate, dtype=DTYPE),
-        'write_content_keys': tf.constant(write_content_keys, dtype=DTYPE),
-        'write_content_strengths': tf.constant(write_content_strengths, dtype=DTYPE)
-    }
+        # Check that turning on allocation gate fully brings the write gate to
+        # the allocation weighting (which we will control by controlling the usage).
+        usage[:, 3] = 0
+        allocation_gate[:, 0] = 1
+        write_gate[:, 0] = 1
 
-    weights = self.cell._write_weights(inputs,
-                                         tf.constant(memory, dtype=DTYPE),
-                                         tf.constant(usage, dtype=DTYPE))
+        inputs = {
+            "allocation_gate": tf.constant(allocation_gate, dtype=DTYPE),
+            "write_gate": tf.constant(write_gate, dtype=DTYPE),
+            "write_content_keys": tf.constant(write_content_keys, dtype=DTYPE),
+            "write_content_strengths": tf.constant(
+                write_content_strengths, dtype=DTYPE
+            ),
+        }
 
-    weights = weights.numpy()
+        weights = self.cell._write_weights(
+            inputs, tf.constant(memory, dtype=DTYPE), tf.constant(usage, dtype=DTYPE)
+        )
 
-    # Check the weights sum to their target gating.
-    self.assertAllClose(np.sum(weights, axis=2), write_gate, atol=5e-2)
+        weights = weights.numpy()
 
-    # Check that we fully allocated to the third row.
-    weights_0_0_target = util.one_hot(MEMORY_SIZE, 3)
-    self.assertAllClose(weights[0, 0], weights_0_0_target, atol=1e-3)
+        # Check the weights sum to their target gating.
+        self.assertAllClose(np.sum(weights, axis=2), write_gate, atol=5e-2)
 
-  def testReadWeights(self):
-    memory = 10 * (np.random.rand(BATCH_SIZE, MEMORY_SIZE, WORD_SIZE) - 0.5)
-    prev_read_weights = np.random.rand(BATCH_SIZE, NUM_READS, MEMORY_SIZE)
-    prev_read_weights /= prev_read_weights.sum(2, keepdims=True) + 1
+        # Check that we fully allocated to the third row.
+        weights_0_0_target = util.one_hot(MEMORY_SIZE, 3)
+        self.assertAllClose(weights[0, 0], weights_0_0_target, atol=1e-3)
 
-    link = np.random.rand(BATCH_SIZE, NUM_WRITES, MEMORY_SIZE, MEMORY_SIZE)
-    # Row and column sums should be at most 1:
-    link /= np.maximum(link.sum(2, keepdims=True), 1)
-    link /= np.maximum(link.sum(3, keepdims=True), 1)
+    def testReadWeights(self):
+        memory = 10 * (np.random.rand(BATCH_SIZE, MEMORY_SIZE, WORD_SIZE) - 0.5)
+        prev_read_weights = np.random.rand(BATCH_SIZE, NUM_READS, MEMORY_SIZE)
+        prev_read_weights /= prev_read_weights.sum(2, keepdims=True) + 1
 
-    # We query the memory on the third location in memory, and select a large
-    # strength on the query. Then we select a content-based read-mode.
-    read_content_keys = np.random.rand(BATCH_SIZE, NUM_READS, WORD_SIZE)
-    read_content_keys[0, 0] = memory[0, 3]
-    read_content_strengths = tf.constant(
-        100., shape=[BATCH_SIZE, NUM_READS], dtype=DTYPE)
-    read_mode = np.random.rand(BATCH_SIZE, NUM_READS, 1 + 2 * NUM_WRITES)
-    read_mode[0, 0, :] = util.one_hot(1 + 2 * NUM_WRITES, 2 * NUM_WRITES)
-    inputs = {
-        'read_content_keys': tf.constant(read_content_keys, dtype=DTYPE),
-        'read_content_strengths': read_content_strengths,
-        'read_mode': tf.constant(read_mode, dtype=DTYPE),
-    }
-    read_weights = self.cell._read_weights(
-        inputs,
-        tf.cast(memory, dtype=DTYPE),
-        tf.cast(prev_read_weights, dtype=DTYPE),
-        tf.cast(link, dtype=DTYPE),
-    )
-    read_weights = read_weights.numpy()
+        link = np.random.rand(BATCH_SIZE, NUM_WRITES, MEMORY_SIZE, MEMORY_SIZE)
+        # Row and column sums should be at most 1:
+        link /= np.maximum(link.sum(2, keepdims=True), 1)
+        link /= np.maximum(link.sum(3, keepdims=True), 1)
 
+        # We query the memory on the third location in memory, and select a large
+        # strength on the query. Then we select a content-based read-mode.
+        read_content_keys = np.random.rand(BATCH_SIZE, NUM_READS, WORD_SIZE)
+        read_content_keys[0, 0] = memory[0, 3]
+        read_content_strengths = tf.constant(
+            100.0, shape=[BATCH_SIZE, NUM_READS], dtype=DTYPE
+        )
+        read_mode = np.random.rand(BATCH_SIZE, NUM_READS, 1 + 2 * NUM_WRITES)
+        read_mode[0, 0, :] = util.one_hot(1 + 2 * NUM_WRITES, 2 * NUM_WRITES)
+        inputs = {
+            "read_content_keys": tf.constant(read_content_keys, dtype=DTYPE),
+            "read_content_strengths": read_content_strengths,
+            "read_mode": tf.constant(read_mode, dtype=DTYPE),
+        }
+        read_weights = self.cell._read_weights(
+            inputs,
+            tf.cast(memory, dtype=DTYPE),
+            tf.cast(prev_read_weights, dtype=DTYPE),
+            tf.cast(link, dtype=DTYPE),
+        )
+        read_weights = read_weights.numpy()
 
-    # read_weights for batch 0, read head 0 should be memory location 3
-    self.assertAllClose(
-        read_weights[0, 0, :], util.one_hot(MEMORY_SIZE, 3), atol=1e-3)
+        # read_weights for batch 0, read head 0 should be memory location 3
+        self.assertAllClose(
+            read_weights[0, 0, :], util.one_hot(MEMORY_SIZE, 3), atol=1e-3
+        )
 
-  def testGradients(self):
-    inputs = tf.constant(np.random.randn(1, BATCH_SIZE, INPUT_SIZE), dtype=DTYPE)
-    test_initial_state = self.module.get_initial_state(inputs=inputs)
-    initial_state = test_initial_state #self.initial_state
-    def evaluate_module(inputs, memory, read_weights, precedence_weights, link):
-        init_state = list(access.AccessState(
-            memory=memory,
-            read_weights=read_weights,
-            write_weights=initial_state[access.WRITE_WEIGHTS],
-            linkage=list(addressing.TemporalLinkageState(
-                precedence_weights=precedence_weights,
-                link=link
-            )),
-            usage=initial_state[access.USAGE],
-        ))
-        output = self.module(inputs, init_state)
-        loss = tf.reduce_sum(input_tensor=output)
-        return loss
+    def testGradients(self):
+        inputs = tf.constant(np.random.randn(1, BATCH_SIZE, INPUT_SIZE), dtype=DTYPE)
+        initial_state = self.module.get_initial_state(inputs=inputs)
 
-    tensors_to_check = [
-        inputs,
-        initial_state[access.MEMORY],
-        initial_state[access.READ_WEIGHTS],
-        initial_state[access.LINKAGE][addressing.PRECEDENCE_WEIGHTS],
-        initial_state[access.LINKAGE][addressing.LINK],
-    ]
+        def evaluate_module(inputs, memory, read_weights, precedence_weights, link):
+            # construct initial state with tensors to check
+            init_state = [
+                memory,
+                read_weights,
+                initial_state[access.WRITE_WEIGHTS],
+                [link, precedence_weights],
+                initial_state[access.USAGE],
+            ]
+            output = self.module(inputs, init_state)
+            loss = tf.reduce_sum(input_tensor=output)
+            return loss
 
-    theoretical, numerical = tf.test.compute_gradient(
-        evaluate_module,
-        tensors_to_check,
-        delta=1e-5
-    )
-    self.assertLess(
-        sum([tf.norm(numerical[i] - theoretical[i]) for i in range(2)]),
-        0.02,
-        tensors_to_check
-    )
+        tensors_to_check = [
+            inputs,
+            initial_state[access.MEMORY],
+            initial_state[access.READ_WEIGHTS],
+            initial_state[access.LINKAGE][addressing.PRECEDENCE_WEIGHTS],
+            initial_state[access.LINKAGE][addressing.LINK],
+        ]
+
+        theoretical, numerical = tf.test.compute_gradient(
+            evaluate_module, tensors_to_check, delta=1e-5
+        )
+        self.assertLess(
+            sum([tf.norm(numerical[i] - theoretical[i]) for i in range(2)]),
+            0.02,
+            tensors_to_check,
+        )

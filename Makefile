@@ -14,6 +14,9 @@ venv:
 
 test: venv
 	python -m pytest
+	black .
+	black dnc/
+	black tests/
 
 run:
 	: # Run your app here, e.g
