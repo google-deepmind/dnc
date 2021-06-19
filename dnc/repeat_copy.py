@@ -223,11 +223,13 @@ class RepeatCopy(snt.Module):
         self._time_average_cost = time_average_cost
         self._dtype = dtype
 
-    def _normalise(self, val):
-        return val / self._norm_max
+    @classmethod
+    def _normalise(cls, val, normalise_factor):
+        return val / normalise_factor
 
-    def _unnormalise(self, val):
-        return val * self._norm_max
+    @classmethod
+    def _unnormalise(cls, val, normalise_factor):
+        return val * normalise_factor
 
     @property
     def time_average_cost(self):
@@ -268,8 +270,6 @@ class RepeatCopy(snt.Module):
         full_obs_size = num_bits + 2
         # We reserve one target dimension for the end-marker.
         full_targ_size = num_bits + 1
-        start_end_flag_idx = full_obs_size - 2
-        num_repeats_channel_idx = full_obs_size - 1
 
         # Samples each batch index's sequence length and the number of repeats.
         sub_seq_length_batch = tf.random.uniform(
@@ -306,51 +306,9 @@ class RepeatCopy(snt.Module):
                 tf.float32,
             )
 
-            # The target pattern is the observation pattern repeated n times.
-            # Some reshaping is required to accomplish the tiling.
-            targ_pattern_shape = [sub_seq_len * num_reps, num_bits]
-            flat_obs_pattern = tf.reshape(obs_pattern, [-1])
-            flat_targ_pattern = tf.tile(flat_obs_pattern, tf.stack([num_reps]))
-            targ_pattern = tf.reshape(flat_targ_pattern, targ_pattern_shape)
-
-            # Expand the obs_pattern to have two extra channels for flags.
-            # Concatenate start flag and num_reps flag to the sequence.
-            obs_flag_channel_pad = tf.zeros([sub_seq_len, 2])
-            obs_start_flag = tf.one_hot(
-                [start_end_flag_idx], full_obs_size, on_value=1.0, off_value=0.0
+            (obs, targ, mask) = self.derive_data_from_inputs(
+                obs_pattern, num_reps, self._norm_max
             )
-            num_reps_flag = tf.one_hot(
-                [num_repeats_channel_idx],
-                full_obs_size,
-                on_value=self._normalise(tf.cast(num_reps, tf.float32)),
-                off_value=0.0,
-            )
-
-            # note the concatenation dimensions.
-            obs = tf.concat([obs_pattern, obs_flag_channel_pad], 1)
-            obs = tf.concat([obs_start_flag, obs], 0)
-            obs = tf.concat([obs, num_reps_flag], 0)
-
-            # Now do the same for the targ_pattern (it only has one extra channel).
-            targ_flag_channel_pad = tf.zeros([sub_seq_len * num_reps, 1])
-            targ_end_flag = tf.one_hot(
-                [start_end_flag_idx], full_targ_size, on_value=1.0, off_value=0.0
-            )
-            targ = tf.concat([targ_pattern, targ_flag_channel_pad], 1)
-            targ = tf.concat([targ, targ_end_flag], 0)
-
-            # Concatenate zeros at end of obs and begining of targ.
-            # This aligns them s.t. the target begins as soon as the obs ends.
-            obs_end_pad = tf.zeros([sub_seq_len * num_reps + 1, full_obs_size])
-            targ_start_pad = tf.zeros([sub_seq_len + 2, full_targ_size])
-
-            # The mask is zero during the obs and one during the targ.
-            mask_off = tf.zeros([sub_seq_len + 2])
-            mask_on = tf.ones([sub_seq_len * num_reps + 1])
-
-            obs = tf.concat([obs, obs_end_pad], 0)
-            targ = tf.concat([targ_start_pad, targ], 0)
-            mask = tf.concat([mask_off, mask_on], 0)
 
             obs_tensors.append(obs)
             targ_tensors.append(targ)
@@ -396,6 +354,66 @@ class RepeatCopy(snt.Module):
             dtype=self._dtype,
         )
         return DatasetTensors(obs, targ, mask)
+
+    @classmethod
+    def derive_data_from_inputs(cls, obs_pattern, num_reps, num_rep_normalise_factor):
+        sub_seq_len, num_bits = obs_pattern.shape
+
+        full_obs_size = num_bits + 2
+        # We reserve one target dimension for the end-marker.
+        full_targ_size = num_bits + 1
+        start_end_flag_idx = full_obs_size - 2
+        num_repeats_channel_idx = full_obs_size - 1
+
+        # The target pattern is the observation pattern repeated n times.
+        # Some reshaping is required to accomplish the tiling.
+        targ_pattern_shape = [sub_seq_len * num_reps, num_bits]
+        flat_obs_pattern = tf.reshape(obs_pattern, [-1])
+        flat_targ_pattern = tf.tile(flat_obs_pattern, tf.stack([num_reps]))
+        targ_pattern = tf.reshape(flat_targ_pattern, targ_pattern_shape)
+
+        # Expand the obs_pattern to have two extra channels for flags.
+        # Concatenate start flag and num_reps flag to the sequence.
+        obs_flag_channel_pad = tf.zeros([sub_seq_len, 2])
+        obs_start_flag = tf.one_hot(
+            [start_end_flag_idx], full_obs_size, on_value=1.0, off_value=0.0
+        )
+        num_reps_flag = tf.one_hot(
+            [num_repeats_channel_idx],
+            full_obs_size,
+            on_value=cls._normalise(
+                tf.cast(num_reps, tf.float32), num_rep_normalise_factor
+            ),
+            off_value=0.0,
+        )
+
+        # note the concatenation dimensions.
+        obs = tf.concat([obs_pattern, obs_flag_channel_pad], 1)
+        obs = tf.concat([obs_start_flag, obs], 0)
+        obs = tf.concat([obs, num_reps_flag], 0)
+
+        # Now do the same for the targ_pattern (it only has one extra channel).
+        targ_flag_channel_pad = tf.zeros([sub_seq_len * num_reps, 1])
+        targ_end_flag = tf.one_hot(
+            [start_end_flag_idx], full_targ_size, on_value=1.0, off_value=0.0
+        )
+        targ = tf.concat([targ_pattern, targ_flag_channel_pad], 1)
+        targ = tf.concat([targ, targ_end_flag], 0)
+
+        # Concatenate zeros at end of obs and begining of targ.
+        # This aligns them s.t. the target begins as soon as the obs ends.
+        obs_end_pad = tf.zeros([sub_seq_len * num_reps + 1, full_obs_size])
+        targ_start_pad = tf.zeros([sub_seq_len + 2, full_targ_size])
+
+        # The mask is zero during the obs and one during the targ.
+        mask_off = tf.zeros([sub_seq_len + 2])
+        mask_on = tf.ones([sub_seq_len * num_reps + 1])
+
+        obs = tf.concat([obs, obs_end_pad], 0)
+        targ = tf.concat([targ_start_pad, targ], 0)
+        mask = tf.concat([mask_off, mask_on], 0)
+
+        return (obs, targ, mask)
 
     def cost(self, logits, targ, mask):
         return masked_sigmoid_cross_entropy(
