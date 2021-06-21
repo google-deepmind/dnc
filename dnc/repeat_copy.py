@@ -431,7 +431,9 @@ class RepeatCopy(snt.Module):
             mask=data.mask.numpy(),
         )
         obs = data.observations
-        unnormalised_num_reps_flag = self._unnormalise(obs[:, :, -1:]).round()
+        unnormalised_num_reps_flag = self._unnormalise(
+            obs[:, :, -1:], self._norm_max
+        ).round()
         obs = np.concatenate([obs[:, :, :-1], unnormalised_num_reps_flag], axis=2)
         data = data._replace(observations=obs)
         return bitstring_readable(data, self.batch_size, model_output, whole_batch)

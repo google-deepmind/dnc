@@ -95,19 +95,13 @@ parser.add_argument(
     "--epochs", default=10000, type=int, help="Number of epochs to train for."
 )
 parser.add_argument(
-    "--log_dir", default="./logs/dnc/", type=str, help="Logging directory."
+    "--log_dir", default="./logs/repeat_copy", type=str, help="Logging directory."
 )
 parser.add_argument(
     "--report_interval",
-    default=100,
+    default=500,
     type=int,
     help="Epochs between reports (samples, valid loss).",
-)
-parser.add_argument(
-    "--checkpoint_dir",
-    default="./checkpoints/repeat_copy",
-    type=str,
-    help="Checkpointing directory.",
 )
 parser.add_argument(
     "--checkpoint_interval", default=2000, type=int, help="Checkpointing step interval."
@@ -182,7 +176,7 @@ def test_step_graphed(
 def train(num_training_iterations, report_interval):
     """Trains the DNC and periodically reports the loss."""
 
-    dataset = repeat_copy.RepeatCopy(
+    train_dataset = repeat_copy.RepeatCopy(
         FLAGS.num_bits,
         FLAGS.batch_size,
         FLAGS.min_length,
@@ -191,7 +185,19 @@ def train(num_training_iterations, report_interval):
         FLAGS.max_repeats,
         dtype=tf.float32,
     )
-    dataset_tensor = dataset()
+    # Generate test data with double maximum repeat length
+    test_dataset = repeat_copy.RepeatCopy(
+        FLAGS.num_bits,
+        100,  # FLAGS.batch_size,
+        FLAGS.min_length,
+        FLAGS.max_length,
+        FLAGS.max_repeats * 2,
+        FLAGS.max_repeats * 2,
+        dtype=tf.float32,
+    )
+
+    dataset_tensor = train_dataset()
+    test_dataset_tensor = test_dataset()
 
     access_config = {
         "memory_size": FLAGS.memory_size,
@@ -208,7 +214,7 @@ def train(num_training_iterations, report_interval):
     dnc_cell = dnc.DNC(
         access_config,
         controller_config,
-        dataset.target_size,
+        train_dataset.target_size,
         FLAGS.batch_size,
         clip_value,
     )
@@ -220,20 +226,20 @@ def train(num_training_iterations, report_interval):
     optimizer = tf.compat.v1.train.RMSPropOptimizer(
         FLAGS.learning_rate, epsilon=FLAGS.optimizer_epsilon
     )
-    loss_fn = dataset.cost
+    loss_fn = train_dataset.cost
 
     # Set up logging and metrics
     train_loss = tf.keras.metrics.Mean("train_loss", dtype=tf.float32)
     test_loss = tf.keras.metrics.Mean("test_loss", dtype=tf.float32)
 
-    current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    train_log_dir = FLAGS.log_dir + current_time + "/train"
-    test_log_dir = FLAGS.log_dir + current_time + "/test"
+    # current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    train_log_dir = FLAGS.log_dir + "/train"
+    test_log_dir = FLAGS.log_dir + "/test"
     train_summary_writer = tf.summary.create_file_writer(train_log_dir)
     test_summary_writer = tf.summary.create_file_writer(test_log_dir)
 
     # Test once to initialize
-    graph_log_dir = FLAGS.log_dir + current_time + "/graph"
+    graph_log_dir = FLAGS.log_dir + "/graph"
     graph_writer = tf.summary.create_file_writer(graph_log_dir)
     with graph_writer.as_default():
         tf.summary.trace_on(graph=True, profiler=True)
@@ -243,7 +249,7 @@ def train(num_training_iterations, report_interval):
     # Set up model checkpointing
     checkpoint = tf.train.Checkpoint(model=dnc_core, optimizer=optimizer)
     manager = tf.train.CheckpointManager(
-        checkpoint, FLAGS.checkpoint_dir, max_to_keep=10
+        checkpoint, FLAGS.log_dir + "/checkpoint", max_to_keep=10
     )
 
     checkpoint.restore(manager.latest_checkpoint)
@@ -254,15 +260,14 @@ def train(num_training_iterations, report_interval):
 
     # Train.
     for epoch in range(num_training_iterations):
-        dataset_tensor = dataset()
+        dataset_tensor = train_dataset()
         train_loss_value = train_step(dataset_tensor, dnc_core, optimizer, loss_fn)
         train_loss(train_loss_value)
 
         # report metrics
         if (epoch) % report_interval == 0:
-            dataset_tensor = dataset()
             test_loss_value, output = test_step(
-                dataset_tensor, dnc_core, optimizer, loss_fn
+                test_dataset_tensor, dnc_core, optimizer, test_dataset.cost
             )
             test_loss(test_loss_value)
             with test_summary_writer.as_default():
@@ -279,7 +284,9 @@ def train(num_training_iterations, report_interval):
                 )
             )
 
-            dataset_string = dataset.to_human_readable(dataset_tensor, output.numpy())
+            dataset_string = test_dataset.to_human_readable(
+                test_dataset_tensor, output.numpy()
+            )
             print(dataset_string)
 
         # reset metrics every epoch
