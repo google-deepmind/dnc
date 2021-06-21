@@ -6,6 +6,7 @@ install: venv
 	mkdir tmp
 	. venv/bin/activate && TMPDIR=tmp pip install -r requirements.txt
 	rm -r tmp/
+	pre-commit install
 
 venv:
 	: # Create venv if it doesn't exist

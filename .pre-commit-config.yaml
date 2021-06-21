@@ -1,11 +1,11 @@
 repos:
 -   repo: https://github.com/ambv/black
-    rev: stable
+    rev: 21.6b0
     hooks:
     - id: black
       language_version: python3.9
 -   repo: https://gitlab.com/pycqa/flake8
-    rev: stable
+    rev: 3.9.2
     hooks:
     - id: flake8
 
