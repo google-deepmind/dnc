@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import numpy as np
 import tensorflow as tf
+from tensorflow.python.framework import random_seed
 
 from dnc import access, addressing, util
 
@@ -35,8 +36,6 @@ DTYPE = tf.float32
 
 # set seeds for determinism
 np.random.seed(42)
-from tensorflow.python.framework import random_seed
-
 random_seed.set_seed(42)
 
 
@@ -52,9 +51,10 @@ class MemoryAccessTest(tf.test.TestCase):
     def testBuildAndTrain(self):
         inputs = tf.random.normal([TIME_STEPS, BATCH_SIZE, INPUT_SIZE], dtype=DTYPE)
         targets = np.random.rand(TIME_STEPS, BATCH_SIZE, NUM_READS, WORD_SIZE)
-        loss = lambda outputs, targets: tf.reduce_mean(
-            input_tensor=tf.square(outputs - targets)
-        )
+
+        def loss(outputs, targets):
+            return tf.reduce_mean(input_tensor=tf.square(outputs - targets))
+
         with tf.GradientTape() as tape:
             outputs = self.module(
                 inputs=inputs,

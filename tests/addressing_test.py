@@ -21,13 +21,12 @@ from __future__ import print_function
 import numpy as np
 import sonnet as snt
 import tensorflow as tf
+from tensorflow.python.framework import random_seed
 
 from dnc import addressing, util
 
 # set seeds for determinism
 np.random.seed(42)
-from tensorflow.python.framework import random_seed
-
 random_seed.set_seed(42)
 
 
@@ -397,7 +396,6 @@ class FreenessTest(tf.test.TestCase):
         memory_size = 5
         usage = tf.constant(np.random.rand(batch_size, memory_size))
         module = addressing.Freeness(memory_size)
-        allocation = module._allocation(usage)
         theoretical, numerical = tf.test.compute_gradient(
             module._allocation, [usage], delta=1e-5
         )

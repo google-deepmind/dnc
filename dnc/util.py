@@ -81,6 +81,6 @@ def initial_state_from_state_size(state_size, batch_size, dtype):
     elif isinstance(state_size, list):
         return [initial_state_from_state_size(s, batch_size, dtype) for s in state_size]
 
-    raise NotImplemented(
-        f"Cannot parse initial_state from state_size of type {type(state)}: {state}"
+    raise NotImplementedError(
+        f"Cannot parse initial_state from state_size of type {type(state_size)}: {state_size}"
     )

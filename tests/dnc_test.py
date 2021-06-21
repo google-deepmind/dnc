@@ -21,14 +21,13 @@ from __future__ import print_function
 import datetime
 import numpy as np
 import tensorflow as tf
+from tensorflow.python.framework import random_seed
 
 from dnc import dnc, access, addressing
 from dnc import repeat_copy
 
 # set seeds for determinism
 np.random.seed(42)
-from tensorflow.python.framework import random_seed
-
 random_seed.set_seed(42)
 
 DTYPE = tf.float32
@@ -80,9 +79,10 @@ class DNCCoreTest(tf.test.TestCase):
     def testBuildAndTrain(self):
         inputs = tf.random.normal([TIME_STEPS, BATCH_SIZE, INPUT_SIZE], dtype=DTYPE)
         targets = np.random.rand(TIME_STEPS, BATCH_SIZE, OUTPUT_SIZE)
-        loss = lambda outputs, targets: tf.reduce_mean(
-            input_tensor=tf.square(outputs - targets)
-        )
+
+        def loss(outputs, targets):
+            return tf.reduce_mean(input_tensor=tf.square(outputs - targets))
+
         optimizer = tf.compat.v1.train.RMSPropOptimizer(
             LEARNING_RATE, epsilon=OPTIMIZER_EPSILON
         )
