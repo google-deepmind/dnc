@@ -120,9 +120,11 @@ class MemoryAccess(snt.RNNCore):
 
         self._linear_layers = {}
 
+    # keras.layers.RNN abstract method
     def call(self, inputs, prev_state):
         return self.__call__(inputs, prev_state)
 
+    # sonnet.RNNCore abstract method
     def __call__(self, inputs, prev_state):
         """Connects the MemoryAccess module into the graph.
 

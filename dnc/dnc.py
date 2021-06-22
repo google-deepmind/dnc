@@ -84,9 +84,11 @@ class DNC(snt.RNNCore):
         else:
             return x
 
+    # keras.layers.RNN abstract method
     def call(self, inputs, prev_state):
         return self.__call__(inputs, prev_state)
 
+    # sonnet.RNNCore abstract method
     def __call__(self, inputs, prev_state):
         """Connects the DNC core into the graph.
 
@@ -134,13 +136,13 @@ class DNC(snt.RNNCore):
             ],
         )
 
-    # keras uses get_initial_state
+    # keras.layers.RNN uses get_initial_state
     def get_initial_state(self, batch_size=None, inputs=None, dtype=None):
         return util.initial_state_from_state_size(
             self.state_size, batch_size, self._dtype
         )
 
-    # snt.RNNCore uses initial_state
+    # sonnet.RNNCore uses initial_state
     def initial_state(self, batch_size=None):
         return self.get_initial_state(batch_size=batch_size)
 
