@@ -356,7 +356,29 @@ class RepeatCopy(snt.Module):
         return DatasetTensors(obs, targ, mask)
 
     @classmethod
-    def derive_data_from_inputs(cls, obs_pattern, num_reps, num_rep_normalise_factor):
+    def derive_data_from_inputs(
+        cls, obs_pattern, num_reps, num_rep_normalise_factor=10
+    ):
+        """Derive observation, target, and mask patterns from input observation tensor.
+
+        Extracted from _build so it can be used for manual inspection of user defined sequences.
+
+        Args:
+            cls: The RepeatCopy class
+            obs_pattern: Tensor representing the bit sequences to copy.
+                Of shape (sub_seq_len, num_bits).
+            num_reps: Int, number of times to repeat obs_pattern.
+            num_rep_normalise_factor: Double, normalisation factor for repeat parameter.
+
+        Returns:
+            obs: Input tensor, obs_pattern with appropriate start sequence flag, num_reps flag
+                and zero padding after pattern.
+            targ: Target tensor, obs_pattern repeated num_reps times with appropriate stop flag
+                and zero padding before pattern.
+            mask: Mask tensor, 0s for input phase and 1s for model output phase to be used for
+                determining what timesteps should be considered for calculating loss
+        """
+
         sub_seq_len, num_bits = obs_pattern.shape
 
         full_obs_size = num_bits + 2

@@ -1,5 +1,4 @@
-
-all: install run
+all: install
 
 install: venv
 	: # Activate venv and install smthing inside
@@ -16,16 +15,10 @@ venv:
 test: venv
 	python -m pytest
 
-run:
-	: # Run your app here, e.g
-	: # determine if we are in venv,
-	: # see https://stackoverflow.com/q/1871549
-	bash -c ". venv/bin/activate && pip -V"
-
 clean:
-	rm -rf venv
+	rm -rf venv/
 	find -iname "*.pyc" -delete
-	rm -rf logs
+	rm -rf logs/
 	rm -rf .pytest_cache
 	rm -rf tmp/
 

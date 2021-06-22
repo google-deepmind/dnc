@@ -69,11 +69,11 @@ parser.add_argument(
     "--batch_size", default=16, type=int, help="Batch size for training."
 )
 parser.add_argument(
-    "--num_bits", default=4, type=int, help="Dimensionality of each vector to copy"
+    "--num_bits", default=8, type=int, help="Dimensionality of each vector to copy"
 )
 parser.add_argument(
     "--min_length",
-    default=2,
+    default=1,
     type=int,
     help="Lower limit on number of vectors in the observation pattern to copy",
 )
@@ -92,7 +92,7 @@ parser.add_argument(
 
 # Training options.
 parser.add_argument(
-    "--epochs", default=10000, type=int, help="Number of epochs to train for."
+    "--epochs", default=100000, type=int, help="Number of epochs to train for."
 )
 parser.add_argument(
     "--log_dir", default="./logs/repeat_copy", type=str, help="Logging directory."
