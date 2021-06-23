@@ -1,9 +1,9 @@
 all: install
 
 install: venv
-	: # Activate venv and install smthing inside
+	: # Activate venv and install requirements
 	mkdir tmp
-	. venv/bin/activate && TMPDIR=tmp pip install -r requirements.txt
+	source venv/bin/activate && TMPDIR=tmp pip install -r requirements.txt
 	rm -r tmp/
 	pre-commit install
 
@@ -13,7 +13,7 @@ venv:
 	test -d venv || python -m venv venv
 
 test: venv
-	python -m pytest
+	source venv/bin/activate && python -m pytest
 
 clean:
 	rm -rf venv/

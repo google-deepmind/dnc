@@ -104,7 +104,13 @@ parser.add_argument(
     help="Epochs between reports (samples, valid loss).",
 )
 parser.add_argument(
-    "--checkpoint_interval", default=2000, type=int, help="Checkpointing step interval."
+    "--checkpoint_interval", default=-1, type=int, help="Checkpointing step interval."
+)
+parser.add_argument(
+    "--test_set_size",
+    default=100,
+    type=int,
+    help="Number of datapoints in the test/validation data set.",
 )
 
 FLAGS = parser.parse_args()
@@ -188,7 +194,7 @@ def train(num_training_iterations, report_interval):
     # Generate test data with double maximum repeat length
     test_dataset = repeat_copy.RepeatCopy(
         FLAGS.num_bits,
-        100,  # FLAGS.batch_size,
+        FLAGS.test_set_size,  # FLAGS.batch_size,
         FLAGS.min_length,
         FLAGS.max_length,
         FLAGS.max_repeats * 2,
@@ -206,7 +212,9 @@ def train(num_training_iterations, report_interval):
         "num_writes": FLAGS.num_write_heads,
     }
     controller_config = {
+        # snt.LSTM takes hidden_size as parameter
         # "hidden_size": FLAGS.hidden_size,
+        # keras.layers.LSTM takes units as parameter
         "units": FLAGS.hidden_size,
     }
     clip_value = FLAGS.clip_value
@@ -289,15 +297,17 @@ def train(num_training_iterations, report_interval):
             )
             print(dataset_string)
 
-        # reset metrics every epoch
-        train_loss.reset_states()
-        test_loss.reset_states()
+            # reset metrics every report_interval
+            train_loss.reset_states()
+            test_loss.reset_states()
 
-        # save model at defined intervals
-        if (1 + epoch) % FLAGS.checkpoint_interval == 0:
+        # save model at defined intervals after training begins if enabled
+        if (
+            FLAGS.checkpoint_interval > 0
+            and epoch
+            and epoch % FLAGS.checkpoint_interval == 0
+        ):
             manager.save()
-    # At the end, checkpoint as well
-    manager.save()
 
 
 def main(unused_argv):

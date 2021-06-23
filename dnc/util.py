@@ -61,14 +61,20 @@ def reduce_prod(x, axis, name=None):
     """Efficient reduce product over axis.
 
     Uses tf.cumprod and tf.gather_nd as a workaround to the poor performance of calculating tf.reduce_prod's gradient on CPU.
+
+    As of TF2, reduce_prod seems not to be the a culprit of increased timings:
+    https://github.com/tensorflow/tensorflow/issues/40748
+
+    Workaround code for future reference:
+
+    with tf.compat.v1.name_scope(name, 'util_reduce_prod', values=[x]):
+        cp = tf.math.cumprod(x, axis, reverse=True)
+        size = tf.shape(input=cp)[0]
+        idx1 = tf.range(tf.cast(size, tf.float32), dtype=tf.float32)
+        idx2 = tf.zeros([size], tf.float32)
+        indices = tf.stack([idx1, idx2], 1)
+        return tf.gather_nd(cp, tf.cast(indices, tf.int32))
     """
-    """with tf.compat.v1.name_scope(name, 'util_reduce_prod', values=[x]):
-    cp = tf.math.cumprod(x, axis, reverse=True)
-    size = tf.shape(input=cp)[0]
-    idx1 = tf.range(tf.cast(size, tf.float32), dtype=tf.float32)
-    idx2 = tf.zeros([size], tf.float32)
-    indices = tf.stack([idx1, idx2], 1)
-    return tf.gather_nd(cp, tf.cast(indices, tf.int32))"""
     return tf.math.reduce_prod(x, axis=axis, name=name)
 
 

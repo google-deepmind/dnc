@@ -258,7 +258,7 @@ class RepeatCopy(snt.Module):
         # return self.datasettensor
 
     def _build(self):
-        """Implements build method which adds ops to graph."""
+        """Implements build method which returns a new labelled data set every invocation."""
 
         # short-hand for private fields.
         min_length, max_length = self._min_length, self._max_length

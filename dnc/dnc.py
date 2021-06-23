@@ -102,7 +102,7 @@ class DNC(snt.RNNCore):
 
         Returns:
           A tuple `(output, next_state)` where `output` is a tensor and `next_state`
-          is a `DNCState` tuple containing the fields `access_output`,
+          is a nested list of tensors representing the dnc state: `access_output`,
           `access_state`, and `controller_state`.
         """
         [prev_access_output, prev_access_state, prev_controller_state] = prev_state
