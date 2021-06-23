@@ -1,0 +1,238 @@
+TensorFlow 2.0 Upgrade Script
+-----------------------------
+Converted 10 files
+Detected 21 issues that require attention
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+File: dnc/train.py
+--------------------------------------------------------------------------------
+dnc/train.py:27:8: ERROR: Using member tf.flags.FLAGS in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+dnc/train.py:30:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+dnc/train.py:31:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+dnc/train.py:32:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+dnc/train.py:33:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+dnc/train.py:34:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+dnc/train.py:35:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+dnc/train.py:39:0: ERROR: Using member tf.flags.DEFINE_float in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+dnc/train.py:40:0: ERROR: Using member tf.flags.DEFINE_float in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+dnc/train.py:41:0: ERROR: Using member tf.flags.DEFINE_float in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+dnc/train.py:45:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+dnc/train.py:46:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+dnc/train.py:47:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+dnc/train.py:50:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+dnc/train.py:53:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+dnc/train.py:55:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+dnc/train.py:59:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+dnc/train.py:61:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+dnc/train.py:63:0: ERROR: Using member tf.flags.DEFINE_string in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+dnc/train.py:65:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+dnc/train.py:115:16: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
+================================================================================
+Detailed log follows:
+
+================================================================================
+================================================================================
+Input tree: 'dnc/'
+================================================================================
+--------------------------------------------------------------------------------
+Processing file 'dnc/addressing_test.py'
+ outputting to 'dncV2/dnc/addressing_test.py'
+--------------------------------------------------------------------------------
+
+39:18: INFO: Renamed 'tf.placeholder' to 'tf.compat.v1.placeholder'
+41:14: INFO: Renamed 'tf.placeholder' to 'tf.compat.v1.placeholder'
+65:10: INFO: Renamed 'tf.placeholder' to 'tf.compat.v1.placeholder'
+66:11: INFO: Renamed 'tf.placeholder' to 'tf.compat.v1.placeholder'
+67:16: INFO: Renamed 'tf.placeholder' to 'tf.compat.v1.placeholder'
+91:10: INFO: Renamed 'tf.placeholder' to 'tf.compat.v1.placeholder'
+92:11: INFO: Renamed 'tf.placeholder' to 'tf.compat.v1.placeholder'
+93:16: INFO: Renamed 'tf.placeholder' to 'tf.compat.v1.placeholder'
+127:11: INFO: Renamed 'tf.random_normal' to 'tf.random.normal'
+128:16: INFO: Renamed 'tf.random_normal' to 'tf.random.normal'
+138:16: INFO: Added keywords to args of function 'tf.gradients'
+158:19: INFO: Renamed 'tf.placeholder' to 'tf.compat.v1.placeholder'
+160:33: INFO: Renamed 'tf.placeholder' to 'tf.compat.v1.placeholder'
+162:23: INFO: Renamed 'tf.placeholder' to 'tf.compat.v1.placeholder'
+379:12: INFO: Renamed 'tf.test.compute_gradient_error' to 'tf.compat.v1.test.compute_gradient_error'
+410:12: INFO: Renamed 'tf.test.compute_gradient_error' to 'tf.compat.v1.test.compute_gradient_error'
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+Processing file 'dnc/access.py'
+ outputting to 'dncV2/dnc/access.py'
+--------------------------------------------------------------------------------
+
+52:7: INFO: `name` passed to `name_scope`. Because you may be re-entering an existing scope, it is not safe to convert automatically,  the v2 name_scope does not support re-entering scopes by name.
+
+52:7: INFO: Renamed 'tf.name_scope' to 'tf.compat.v1.name_scope'
+59:7: INFO: `name` passed to `name_scope`. Because you may be re-entering an existing scope, it is not safe to convert automatically,  the v2 name_scope does not support re-entering scopes by name.
+
+59:7: INFO: Renamed 'tf.name_scope' to 'tf.compat.v1.name_scope'
+239:9: INFO: `name` passed to `name_scope`. Because you may be re-entering an existing scope, it is not safe to convert automatically,  the v2 name_scope does not support re-entering scopes by name.
+
+239:9: INFO: Renamed 'tf.name_scope' to 'tf.compat.v1.name_scope'
+281:9: INFO: `name` passed to `name_scope`. Because you may be re-entering an existing scope, it is not safe to convert automatically,  the v2 name_scope does not support re-entering scopes by name.
+
+281:9: INFO: Renamed 'tf.name_scope' to 'tf.compat.v1.name_scope'
+299:62: INFO: Added keywords to args of function 'tf.reduce_sum'
+301:10: INFO: Added keywords to args of function 'tf.reduce_sum'
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+Processing file 'dnc/dnc.py'
+ outputting to 'dncV2/dnc/dnc.py'
+--------------------------------------------------------------------------------
+
+113:23: INFO: Renamed 'tf.contrib.framework.nest.map_structure' to 'tf.nest.map_structure'
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+Processing file 'dnc/train.py'
+ outputting to 'dncV2/dnc/train.py'
+--------------------------------------------------------------------------------
+
+27:8: ERROR: Using member tf.flags.FLAGS in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+30:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+31:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+32:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+33:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+34:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+35:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+39:0: ERROR: Using member tf.flags.DEFINE_float in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+40:0: ERROR: Using member tf.flags.DEFINE_float in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+41:0: ERROR: Using member tf.flags.DEFINE_float in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+45:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+46:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+47:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+50:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+53:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+55:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+59:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+61:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+63:0: ERROR: Using member tf.flags.DEFINE_string in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+65:0: ERROR: Using member tf.flags.DEFINE_integer in deprecated module tf.flags. tf.flags and tf.app.flags have been removed, please use the argparse or absl modules if you need command line parsing.
+85:23: INFO: Renamed 'tf.nn.dynamic_rnn' to 'tf.compat.v1.nn.dynamic_rnn'
+111:24: INFO: Renamed 'tf.trainable_variables' to 'tf.compat.v1.trainable_variables'
+113:6: INFO: Added keywords to args of function 'tf.gradients'
+115:16: WARNING: tf.get_variable requires manual check. tf.get_variable returns ResourceVariables by default in 2.0, which have well-defined semantics and are stricter about shapes. You can disable this behavior by passing use_resource=False, or by calling tf.compat.v1.disable_resource_variables().
+115:16: INFO: Renamed 'tf.get_variable' to 'tf.compat.v1.get_variable'
+119:18: INFO: tf.zeros_initializer requires manual check. Initializers no longer have the dtype argument in the constructor or partition_info argument in the __call__ method.
+The calls have been converted to compat.v1 for safety (even though they may already have been correct).
+119:18: INFO: Renamed 'tf.zeros_initializer' to 'tf.compat.v1.zeros_initializer'
+121:19: INFO: Renamed 'tf.GraphKeys' to 'tf.compat.v1.GraphKeys'
+121:50: INFO: Renamed 'tf.GraphKeys' to 'tf.compat.v1.GraphKeys'
+123:14: INFO: Renamed 'tf.train.RMSPropOptimizer' to 'tf.compat.v1.train.RMSPropOptimizer'
+128:10: INFO: Renamed 'tf.train.Saver' to 'tf.compat.v1.train.Saver'
+132:8: INFO: Renamed 'tf.train.CheckpointSaverHook' to 'tf.estimator.CheckpointSaverHook'
+141:7: INFO: Renamed 'tf.train.SingularMonitoredSession' to 'tf.compat.v1.train.SingularMonitoredSession'
+155:8: INFO: Renamed 'tf.logging.info' to 'tf.compat.v1.logging.info'
+162:2: INFO: Renamed 'tf.logging.set_verbosity' to 'tf.compat.v1.logging.set_verbosity'
+167:2: INFO: Renamed 'tf.app.run' to 'tf.compat.v1.app.run'
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+Processing file 'dnc/repeat_copy.py'
+ outputting to 'dncV2/dnc/repeat_copy.py'
+--------------------------------------------------------------------------------
+
+53:20: INFO: Added keywords to args of function 'tf.reduce_sum'
+54:15: INFO: Added keywords to args of function 'tf.reduce_sum'
+56:23: INFO: Added keywords to args of function 'tf.shape'
+59:17: INFO: Added keywords to args of function 'tf.reduce_sum'
+62:9: INFO: Added keywords to args of function 'tf.reduce_sum'
+64:12: INFO: Renamed 'tf.log' to 'tf.math.log'
+269:27: INFO: Renamed 'tf.random_uniform' to 'tf.random.uniform'
+271:24: INFO: Renamed 'tf.random_uniform' to 'tf.random.uniform'
+276:23: INFO: Added keywords to args of function 'tf.reduce_max'
+295:10: INFO: Renamed 'tf.random_uniform' to 'tf.random.uniform'
+375:11: INFO: Added keywords to args of function 'tf.transpose'
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+Processing file 'dnc/util_test.py'
+ outputting to 'dncV2/dnc/util_test.py'
+--------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+Processing file 'dnc/addressing.py'
+ outputting to 'dncV2/dnc/addressing.py'
+--------------------------------------------------------------------------------
+
+35:18: INFO: Added keywords to args of function 'tf.reduce_sum'
+173:9: INFO: `name` passed to `name_scope`. Because you may be re-entering an existing scope, it is not safe to convert automatically,  the v2 name_scope does not support re-entering scopes by name.
+
+173:9: INFO: Renamed 'tf.name_scope' to 'tf.compat.v1.name_scope'
+181:13: INFO: Added keywords to args of function 'tf.transpose'
+204:9: INFO: `name` passed to `name_scope`. Because you may be re-entering an existing scope, it is not safe to convert automatically,  the v2 name_scope does not support re-entering scopes by name.
+
+204:9: INFO: Renamed 'tf.name_scope' to 'tf.compat.v1.name_scope'
+205:19: INFO: Added keywords to args of function 'tf.shape'
+214:13: INFO: Renamed 'tf.matrix_set_diag' to 'tf.linalg.set_diag'
+238:9: INFO: `name` passed to `name_scope`. Because you may be re-entering an existing scope, it is not safe to convert automatically,  the v2 name_scope does not support re-entering scopes by name.
+
+238:9: INFO: Renamed 'tf.name_scope' to 'tf.compat.v1.name_scope'
+239:18: INFO: Added keywords to args of function 'tf.reduce_sum'
+329:9: INFO: `name` passed to `name_scope`. Because you may be re-entering an existing scope, it is not safe to convert automatically,  the v2 name_scope does not support re-entering scopes by name.
+
+329:9: INFO: Renamed 'tf.name_scope' to 'tf.compat.v1.name_scope'
+352:9: INFO: `name` passed to `name_scope`. Because you may be re-entering an existing scope, it is not safe to convert automatically,  the v2 name_scope does not support re-entering scopes by name.
+
+352:9: INFO: Renamed 'tf.name_scope' to 'tf.compat.v1.name_scope'
+370:9: INFO: `name` passed to `name_scope`. Because you may be re-entering an existing scope, it is not safe to convert automatically,  the v2 name_scope does not support re-entering scopes by name.
+
+370:9: INFO: Renamed 'tf.name_scope' to 'tf.compat.v1.name_scope'
+391:9: INFO: `name` passed to `name_scope`. Because you may be re-entering an existing scope, it is not safe to convert automatically,  the v2 name_scope does not support re-entering scopes by name.
+
+391:9: INFO: Renamed 'tf.name_scope' to 'tf.compat.v1.name_scope'
+399:26: INFO: Renamed 'tf.cumprod' to 'tf.math.cumprod'
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+Processing file 'dnc/__init__.py'
+ outputting to 'dncV2/dnc/__init__.py'
+--------------------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+Processing file 'dnc/util.py'
+ outputting to 'dncV2/dnc/util.py'
+--------------------------------------------------------------------------------
+
+27:7: INFO: `name` passed to `name_scope`. Because you may be re-entering an existing scope, it is not safe to convert automatically,  the v2 name_scope does not support re-entering scopes by name.
+
+27:7: INFO: Renamed 'tf.name_scope' to 'tf.compat.v1.name_scope'
+30:19: INFO: Added keywords to args of function 'tf.shape'
+31:20: INFO: Added keywords to args of function 'tf.shape'
+37:11: INFO: Renamed 'tf.invert_permutation' to 'tf.math.invert_permutation'
+44:7: INFO: `name` passed to `name_scope`. Because you may be re-entering an existing scope, it is not safe to convert automatically,  the v2 name_scope does not support re-entering scopes by name.
+
+44:7: INFO: Renamed 'tf.name_scope' to 'tf.compat.v1.name_scope'
+46:11: INFO: Added keywords to args of function 'tf.shape'
+66:7: INFO: `name` passed to `name_scope`. Because you may be re-entering an existing scope, it is not safe to convert automatically,  the v2 name_scope does not support re-entering scopes by name.
+
+66:7: INFO: Renamed 'tf.name_scope' to 'tf.compat.v1.name_scope'
+67:9: INFO: Renamed 'tf.cumprod' to 'tf.math.cumprod'
+68:11: INFO: Added keywords to args of function 'tf.shape'
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+Processing file 'dnc/access_test.py'
+ outputting to 'dncV2/dnc/access_test.py'
+--------------------------------------------------------------------------------
+
+45:13: INFO: Renamed 'tf.random_normal' to 'tf.random.normal'
+54:11: INFO: Added keywords to args of function 'tf.reduce_mean'
+55:15: INFO: Renamed 'tf.train.GradientDescentOptimizer' to 'tf.compat.v1.train.GradientDescentOptimizer'
+56:11: INFO: Renamed 'tf.global_variables_initializer' to 'tf.compat.v1.global_variables_initializer'
+64:8: INFO: Renamed 'tf.random_normal' to 'tf.random.normal'
+65:11: INFO: Renamed 'tf.global_variables_initializer' to 'tf.compat.v1.global_variables_initializer'
+148:11: INFO: Added keywords to args of function 'tf.reduce_sum'
+157:15: INFO: Renamed 'tf.global_variables_initializer' to 'tf.compat.v1.global_variables_initializer'
+158:12: INFO: Renamed 'tf.test.compute_gradient_error' to 'tf.compat.v1.test.compute_gradient_error'
+--------------------------------------------------------------------------------
+
