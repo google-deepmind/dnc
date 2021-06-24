@@ -36,6 +36,23 @@ architecture.
 
 ![DNC architecture](images/dnc_model.png)
 
+## Installation
+```shell
+make install
+```
+
+The above command will create a virtual environment and install the dependencies and pre-commit hooks.
+
+Run `source venv/bin/activate` in the root directory of this repository to activate the installed virtual env.
+
+## Testing
+```shell
+make test
+```
+
+Run unit tests in `tests/` using pytest.
+
+
 ## Train
 The `DNC` requires an installation of [TensorFlow](https://www.tensorflow.org/)
 and [Sonnet](https://github.com/deepmind/sonnet). An example training script is
@@ -59,13 +76,26 @@ $ ipython train.py -- --memory_size=64 --num_bits=8 --max_length=3
 Periodically saving, or 'checkpointing', the model is disabled by default. To
 enable, use the `checkpoint_interval` flag. E.g. `--checkpoint_interval=10000`
 will ensure a checkpoint is created every `10,000` steps. The model will be
-checkpointed to `/tmp/tf/dnc/` by default. From there training can be resumed.
-To specify an alternate checkpoint directory, use the `checkpoint_dir` flag.
-Note: ensure that `/tmp/tf/dnc/` is deleted before training is resumed with
+checkpointed to `./logs/repeat_copy/checkpoint` by default. From there training can be resumed.
+To specify an alternate checkpoint directory, use the `log_dir` flag.
+Note: ensure that existing checkpoints are deleted or moved before training is resumed with
 different model parameters, to avoid shape inconsistency errors.
 
 More generally, the `DNC` class found within `dnc.py` can be used as a standard
 TensorFlow rnn core and unrolled with TensorFlow rnn ops, such as
-`tf.nn.dynamic_rnn` on any sequential task.
+`keras.layers.RNN` on any sequential task.
+
+## Model Inspection
+```shell
+jupyter notebook interactive.ipynb
+```
+
+Jupyter notebook that loads a trained model from checkpoints. It provides helper functions for evaluating arbitrary input bit sequences and visualizing output and intermediate read/write states.
+
+```shell
+tensorboard --logdir logs/repeat_copy/
+```
+
+Tensorboard visualization of test/train loss and TensorFlow Graph. Test/Train loss is emitted based on `report_interval`.
 
 Disclaimer: This is not an official Google product
