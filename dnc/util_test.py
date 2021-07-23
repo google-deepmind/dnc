@@ -23,6 +23,11 @@ import tensorflow as tf
 
 from dnc import util
 
+try:
+  xrange
+except NameError:
+  xrange = range
+
 
 class BatchInvertPermutation(tf.test.TestCase):
 
