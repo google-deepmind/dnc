@@ -25,6 +25,11 @@ import tensorflow as tf
 from dnc import addressing
 from dnc import util
 
+try:
+  xrange
+except NameError:
+  xrange = range
+
 
 class WeightedSoftmaxTest(tf.test.TestCase):
 
